@@ -1,6 +1,15 @@
 # claude-block
 
-File and directory protection for Claude Code using `.claude-block` configuration files.
+**Protect sensitive files from accidental AI modifications.**
+
+Drop a `.claude-block` file in any directory to control what Claude can and cannot edit. Protect configs, lock files, migrations, or entire directories with simple pattern rules.
+
+## Why use this?
+
+- **Prevent accidents** — Stop Claude from touching lock files, CI workflows, or database migrations
+- **Scope to features** — Keep Claude focused on relevant directories, not unrelated code
+- **Guide Claude** — Custom messages explain why files are protected and what to do instead
+- **Zero friction** — Once set up, protection works automatically on every session
 
 ## Installation
 
@@ -81,7 +90,7 @@ Block specific patterns, allow everything else:
 
 ```json
 {
-  "blocked": ["*.config.js", "secrets/**/*", "*.env*"]
+  "blocked": ["*.lock", "package-lock.json", "migrations/**/*", ".github/**/*"]
 }
 ```
 
@@ -103,10 +112,21 @@ Different messages for different patterns:
 ```json
 {
   "blocked": [
-    { "pattern": "*.env*", "guide": "Environment files contain secrets." },
-    { "pattern": "config/**", "guide": "Config files require review." }
+    { "pattern": "*.lock", "guide": "Lock files are auto-generated. Run the package manager instead." },
+    { "pattern": ".github/**/*", "guide": "CI workflows need manual review." }
   ],
   "guide": "This directory has protected files."
+}
+```
+
+### Scope to Feature
+
+Keep Claude focused on specific directories during feature work:
+
+```json
+{
+  "allowed": ["src/features/auth/**/*", "src/components/auth/**/*", "tests/auth/**/*"],
+  "guide": "Working on auth feature. Only touching auth-related files."
 }
 ```
 
@@ -130,35 +150,13 @@ Different messages for different patterns:
 
 ## How It Works
 
-1. When Claude tries to modify a file, the hook checks for `.claude-block` and `.claude-block.local` in the target directory and all parent directories
-2. If found, both files are read and their configurations are merged
-3. The hook evaluates the patterns against the target file path
-4. Based on the mode (block-all, allowed-list, blocked-list), the operation is allowed or blocked
-5. If blocked, the guide message (if any) is shown to help Claude understand why
+The plugin hooks into Claude's file operations. When Claude tries to modify a file, it checks for `.claude-block` and `.claude-block.local` files in the target directory and parents, merges their configurations, then allows or blocks based on your rules.
 
-## Protection Rules
-
-- `.claude-block` and `.claude-block.local` files cannot be modified or deleted by Claude once created
-- Protection applies to all files in the directory and subdirectories
-- The closest configuration file(s) to the target takes precedence
-- When both `.claude-block` and `.claude-block.local` exist, they are merged
-- Invalid configurations (both `allowed` and `blocked` specified, or mixed modes between files) will block all operations
-
-## Plugin Structure
-
-```
-claude-block/
-├── .claude-plugin/
-│   └── plugin.json          # Plugin metadata
-├── hooks/
-│   ├── hooks.json           # Hook configuration
-│   └── protect-directories.ps1  # Protection enforcement
-├── skills/
-│   └── claude-block/
-│       └── SKILL.md         # Interactive creator skill
-├── LICENSE
-└── README.md
-```
+**Key behaviors:**
+- `.claude-block` and `.claude-block.local` files themselves are always protected (cannot be modified by Claude)
+- Protection cascades to all subdirectories
+- Closest configuration file(s) to the target file takes precedence
+- When both files exist, they are merged (blocked patterns combined, local guide takes precedence)
 
 ## License
 
