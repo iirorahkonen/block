@@ -1,2 +1,5 @@
 .worktrees/
 .claude/
+
+# Local protection configuration files (not committed)
+.claude-block.local

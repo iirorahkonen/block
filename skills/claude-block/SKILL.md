@@ -5,7 +5,7 @@ description: Create and manage .claude-block files for directory protection. Use
 
 # .claude-block Creator
 
-This skill helps you create .claude-block files to protect directories from Claude Code modifications.
+This skill helps you create .claude-block and .claude-block.local files to protect directories from Claude Code modifications.
 
 ## When to Use
 
@@ -13,6 +13,7 @@ This skill helps you create .claude-block files to protect directories from Clau
 - User asks about .claude-block files
 - User wants to restrict which files Claude can edit
 - User says "lock", "protect", or "restrict" in context of files/directories
+- User wants local/personal protection rules that aren't committed to git
 
 ## .claude-block Format Reference
 
@@ -57,7 +58,19 @@ Files matching these patterns are protected; all others can be edited.
 
 ## Workflow
 
-### Step 1: Ask Protection Mode
+### Step 1: Ask File Type
+
+Use AskUserQuestion to determine whether to create a main or local file:
+
+```
+Question: "Should this be a shared or local configuration?"
+Header: "File type"
+Options:
+1. "Shared (.claude-block)" - "Committed to git, shared with team"
+2. "Local (.claude-block.local)" - "Not committed, personal/machine-specific rules"
+```
+
+### Step 2: Ask Protection Mode
 
 Use AskUserQuestion to determine the protection mode:
 
@@ -70,10 +83,10 @@ Options:
 3. "Blocked list" - "Protect specific file patterns, allow everything else"
 ```
 
-### Step 2: Ask Directory Location
+### Step 3: Ask Directory Location
 
 ```
-Question: "Where should the .claude-block file be created?"
+Question: "Where should the configuration file be created?"
 Header: "Location"
 Options:
 1. "Current directory" - "Create in the current working directory"
@@ -82,7 +95,7 @@ Options:
 
 If user chooses "Specify path", ask them to provide the path.
 
-### Step 3: Ask for Patterns (if not Block All)
+### Step 4: Ask for Patterns (if not Block All)
 
 If the user chose "Allowed list" or "Blocked list":
 
@@ -103,7 +116,7 @@ Pattern syntax reference:
 - `?` - matches single character
 - `{a,b}` - matches either a or b
 
-### Step 4: Ask About Guide Message
+### Step 5: Ask About Guide Message
 
 **Do NOT use AskUserQuestion here.** Ask in plain text:
 
@@ -111,9 +124,13 @@ Pattern syntax reference:
 
 If the user provides a message, include it. If they say no or skip, omit the guide field.
 
-### Step 5: Generate the File
+### Step 6: Generate the File
 
-Based on the collected information, generate the .claude-block file:
+Based on the collected information, generate the configuration file.
+
+**File name:**
+- Shared: `.claude-block`
+- Local: `.claude-block.local`
 
 **Block All Mode:**
 ```json
@@ -138,12 +155,30 @@ Based on the collected information, generate the .claude-block file:
 
 Write the file to the specified location using the Write tool.
 
-### Step 6: Confirm Creation
+### Step 7: Add to .gitignore (for local files only)
+
+If creating a `.claude-block.local` file, check if `.claude-block.local` is already in the repository's `.gitignore`. If not, offer to add it:
+
+1. Look for `.gitignore` in the repository root (use git to find the root if needed)
+2. Check if `.claude-block.local` is already listed
+3. If not present, append `.claude-block.local` to the `.gitignore` file
+
+Use AskUserQuestion if unsure:
+```
+Question: "Add .claude-block.local to .gitignore?"
+Header: "Gitignore"
+Options:
+1. "Yes (Recommended)" - "Prevent local config from being committed"
+2. "No" - "I'll manage .gitignore manually"
+```
+
+### Step 8: Confirm Creation
 
 After creating the file, confirm to the user:
-- File location
+- File location and type (shared or local)
 - Protection mode
 - Patterns configured (if any)
 - Guide message (if any)
+- Whether .gitignore was updated (for local files)
 
 Remind the user that they can edit the file manually to adjust settings.

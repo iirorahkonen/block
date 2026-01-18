@@ -30,6 +30,29 @@ Use the `/claude-block` skill to interactively create a `.claude-block` file:
 
 Create a `.claude-block` file in any directory you want to protect.
 
+### Local Configuration Files
+
+For personal or machine-specific protection rules that shouldn't be committed to git, use `.claude-block.local`:
+
+```json
+// .claude-block.local - not committed to git
+{
+  "blocked": [".personal-config", "local-secrets/**/*"]
+}
+```
+
+Add `.claude-block.local` to your `.gitignore`:
+
+```
+.claude-block.local
+```
+
+When both `.claude-block` and `.claude-block.local` exist in the same directory:
+- **Blocked patterns**: Combined (union) - files blocked by either config are protected
+- **Allowed patterns**: Local overrides main
+- **Guide messages**: Local takes precedence
+- **Note**: Cannot mix `allowed` and `blocked` modes between the two files
+
 ## .claude-block Format
 
 The `.claude-block` file uses JSON format with three modes:
@@ -107,17 +130,19 @@ Different messages for different patterns:
 
 ## How It Works
 
-1. When Claude tries to modify a file, the hook checks for `.claude-block` in the target directory and all parent directories
-2. If found, the hook evaluates the patterns against the target file path
-3. Based on the mode (block-all, allowed-list, blocked-list), the operation is allowed or blocked
-4. If blocked, the guide message (if any) is shown to help Claude understand why
+1. When Claude tries to modify a file, the hook checks for `.claude-block` and `.claude-block.local` in the target directory and all parent directories
+2. If found, both files are read and their configurations are merged
+3. The hook evaluates the patterns against the target file path
+4. Based on the mode (block-all, allowed-list, blocked-list), the operation is allowed or blocked
+5. If blocked, the guide message (if any) is shown to help Claude understand why
 
 ## Protection Rules
 
-- `.claude-block` files cannot be modified or deleted by Claude once created
+- `.claude-block` and `.claude-block.local` files cannot be modified or deleted by Claude once created
 - Protection applies to all files in the directory and subdirectories
-- The closest `.claude-block` file to the target takes precedence
-- Invalid configurations (both `allowed` and `blocked` specified) will block all operations
+- The closest configuration file(s) to the target takes precedence
+- When both `.claude-block` and `.claude-block.local` exist, they are merged
+- Invalid configurations (both `allowed` and `blocked` specified, or mixed modes between files) will block all operations
 
 ## Plugin Structure
 

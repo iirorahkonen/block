@@ -1,6 +1,16 @@
 #!/bin/bash
 # Claude Code Directory Protection Hook
-# Blocks file modifications when .claude-block exists in target directory or parent
+# Blocks file modifications when .claude-block or .claude-block.local exists in target directory or parent
+#
+# Configuration files:
+#   .claude-block       - Main configuration file (committed to git)
+#   .claude-block.local - Local configuration file (not committed, add to .gitignore)
+#
+# When both files exist in the same directory, they are merged:
+#   - blocked patterns: combined (union - more restrictive)
+#   - allowed patterns: local overrides main
+#   - guide messages: local takes precedence
+#   - Mixing allowed/blocked modes between files is an error
 #
 # .claude-block file format (JSON):
 #   Empty file or {} = block everything
@@ -25,6 +35,7 @@
 #   ? = single character
 
 MARKER_FILE_NAME=".claude-block"
+LOCAL_MARKER_FILE_NAME=".claude-block.local"
 
 # Check if jq is available - FAIL CLOSED if missing
 if ! command -v jq &> /dev/null; then
@@ -207,6 +218,114 @@ get_lock_file_config() {
     echo "$config"
 }
 
+# Merge two configs (main and local)
+# Local file extends/overrides main file
+# - If either has error: merged has error
+# - If either is empty (block all): merged is empty (block all)
+# - If both have blocked: combine arrays (union - more restrictive)
+# - If both have allowed: local overrides main
+# - If one has allowed, other has blocked: error
+# - Guide: local takes precedence, falls back to main
+merge_configs() {
+    local main_config="$1"
+    local local_config="$2"
+
+    # If no local config, return main as-is
+    if [[ -z "$local_config" || "$local_config" == "null" ]]; then
+        echo "$main_config"
+        return
+    fi
+
+    # Check for errors in either config
+    local main_error local_error
+    main_error=$(echo "$main_config" | jq -r '.has_error')
+    local_error=$(echo "$local_config" | jq -r '.has_error')
+
+    if [[ "$main_error" == "true" ]]; then
+        echo "$main_config"
+        return
+    fi
+    if [[ "$local_error" == "true" ]]; then
+        echo "$local_config"
+        return
+    fi
+
+    # Check if either is empty (block all) - most restrictive wins
+    local main_empty local_empty
+    main_empty=$(echo "$main_config" | jq -r '.is_empty')
+    local_empty=$(echo "$local_config" | jq -r '.is_empty')
+
+    if [[ "$main_empty" == "true" || "$local_empty" == "true" ]]; then
+        # Return empty config (block all), but prefer local guide if available
+        local local_guide
+        local_guide=$(echo "$local_config" | jq -r '.guide // ""')
+        if [[ -n "$local_guide" ]]; then
+            echo '{"allowed":[],"blocked":[],"guide":"'"$local_guide"'","is_empty":true,"has_error":false,"error_message":""}'
+        else
+            local main_guide
+            main_guide=$(echo "$main_config" | jq -r '.guide // ""')
+            echo '{"allowed":[],"blocked":[],"guide":"'"$main_guide"'","is_empty":true,"has_error":false,"error_message":""}'
+        fi
+        return
+    fi
+
+    # Check for mode compatibility
+    local main_has_allowed main_has_blocked local_has_allowed local_has_blocked
+    main_has_allowed=$(echo "$main_config" | jq '.allowed | length > 0')
+    main_has_blocked=$(echo "$main_config" | jq '.blocked | length > 0')
+    local_has_allowed=$(echo "$local_config" | jq '.allowed | length > 0')
+    local_has_blocked=$(echo "$local_config" | jq '.blocked | length > 0')
+
+    # Mixed modes = error
+    if [[ "$main_has_allowed" == "true" && "$local_has_blocked" == "true" ]] || \
+       [[ "$main_has_blocked" == "true" && "$local_has_allowed" == "true" ]]; then
+        echo '{"allowed":[],"blocked":[],"guide":"","is_empty":false,"has_error":true,"error_message":"Invalid configuration: .claude-block and .claude-block.local cannot mix allowed and blocked modes"}'
+        return
+    fi
+
+    # Determine guide (local takes precedence)
+    local merged_guide
+    local local_guide main_guide
+    local_guide=$(echo "$local_config" | jq -r '.guide // ""')
+    main_guide=$(echo "$main_config" | jq -r '.guide // ""')
+    if [[ -n "$local_guide" ]]; then
+        merged_guide="$local_guide"
+    else
+        merged_guide="$main_guide"
+    fi
+
+    # Merge based on mode
+    if [[ "$main_has_blocked" == "true" || "$local_has_blocked" == "true" ]]; then
+        # Blocked mode: combine arrays (union)
+        local main_blocked local_blocked merged_blocked
+        main_blocked=$(echo "$main_config" | jq '.blocked')
+        local_blocked=$(echo "$local_config" | jq '.blocked')
+        merged_blocked=$(jq -n --argjson a "$main_blocked" --argjson b "$local_blocked" '$a + $b | unique')
+
+        jq -n \
+            --argjson blocked "$merged_blocked" \
+            --arg guide "$merged_guide" \
+            '{"allowed":[],"blocked":$blocked,"guide":$guide,"is_empty":false,"has_error":false,"error_message":""}'
+    elif [[ "$main_has_allowed" == "true" || "$local_has_allowed" == "true" ]]; then
+        # Allowed mode: local overrides main (if local has allowed), otherwise use main
+        local merged_allowed
+        if [[ "$local_has_allowed" == "true" ]]; then
+            merged_allowed=$(echo "$local_config" | jq '.allowed')
+        else
+            merged_allowed=$(echo "$main_config" | jq '.allowed')
+        fi
+
+        jq -n \
+            --argjson allowed "$merged_allowed" \
+            --arg guide "$merged_guide" \
+            '{"allowed":$allowed,"blocked":[],"guide":$guide,"is_empty":false,"has_error":false,"error_message":""}'
+    else
+        # Both configs have no patterns, return block all with merged guide
+        jq -n --arg guide "$merged_guide" \
+            '{"allowed":[],"blocked":[],"guide":$guide,"is_empty":true,"has_error":false,"error_message":""}'
+    fi
+}
+
 # Get full/absolute path
 get_full_path() {
     local path="$1"
@@ -239,20 +358,47 @@ test_directory_protected() {
 
     [[ -z "$directory" ]] && return 1
 
-    # Walk up directory tree checking for marker
+    # Walk up directory tree checking for marker files
     while [[ -n "$directory" ]]; do
         local marker_path="${directory}/${MARKER_FILE_NAME}"
+        local local_marker_path="${directory}/${LOCAL_MARKER_FILE_NAME}"
+        local has_main=false
+        local has_local=false
 
-        if [[ -f "$marker_path" ]]; then
-            local config
-            config=$(get_lock_file_config "$marker_path")
+        [[ -f "$marker_path" ]] && has_main=true
+        [[ -f "$local_marker_path" ]] && has_local=true
+
+        if [[ "$has_main" == "true" || "$has_local" == "true" ]]; then
+            local main_config local_config merged_config
+            local effective_marker_path
+
+            # Get configs from both files
+            if [[ "$has_main" == "true" ]]; then
+                main_config=$(get_lock_file_config "$marker_path")
+                effective_marker_path="$marker_path"
+            else
+                main_config='{"allowed":[],"blocked":[],"guide":"","is_empty":true,"has_error":false,"error_message":""}'
+            fi
+
+            if [[ "$has_local" == "true" ]]; then
+                local_config=$(get_lock_file_config "$local_marker_path")
+                # If we have local but no main, use local as the effective marker
+                [[ "$has_main" != "true" ]] && effective_marker_path="$local_marker_path"
+                # If we have both, mention both in marker path
+                [[ "$has_main" == "true" ]] && effective_marker_path="$marker_path (+ .local)"
+            else
+                local_config=""
+            fi
+
+            # Merge configs
+            merged_config=$(merge_configs "$main_config" "$local_config")
 
             # Return protection info as JSON
             jq -n \
                 --arg target "$file_path" \
-                --arg marker "$marker_path" \
+                --arg marker "$effective_marker_path" \
                 --arg dir "$directory" \
-                --argjson config "$config" \
+                --argjson config "$merged_config" \
                 '{target_file: $target, marker_path: $marker, marker_directory: $dir, config: $config}'
             return 0
         fi
@@ -328,7 +474,7 @@ get_bash_target_paths() {
     printf '%s\n' "${paths[@]}" | sort -u | tr '\n' ' '
 }
 
-# Check if path is a marker file
+# Check if path is a marker file (main or local)
 test_is_marker_file() {
     local file_path="$1"
 
@@ -337,7 +483,7 @@ test_is_marker_file() {
     local filename
     filename=$(basename "$file_path")
 
-    [[ "$filename" == "$MARKER_FILE_NAME" ]]
+    [[ "$filename" == "$MARKER_FILE_NAME" || "$filename" == "$LOCAL_MARKER_FILE_NAME" ]]
 }
 
 # Block marker file removal
