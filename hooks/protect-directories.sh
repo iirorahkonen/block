@@ -137,8 +137,11 @@ test_path_matches_pattern() {
     base_path="${base_path%/}"  # Remove trailing slash
 
     # Make path relative to base path (case-insensitive comparison for Windows compatibility)
-    local lower_path="${path,,}"
-    local lower_base="${base_path,,}"
+    # Use tr for POSIX compatibility (macOS ships with Bash 3.2 which doesn't support ${var,,})
+    local lower_path
+    local lower_base
+    lower_path=$(echo "$path" | tr '[:upper:]' '[:lower:]')
+    lower_base=$(echo "$base_path" | tr '[:upper:]' '[:lower:]')
 
     if [[ "$lower_path" == "$lower_base"* ]]; then
         local relative_path="${path:${#base_path}}"

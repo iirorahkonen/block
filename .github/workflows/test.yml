@@ -161,7 +161,7 @@ jobs:
           echo "Edit tool correctly blocked"
 
           # Test using the cross-platform runner (run-hook.cmd)
-          echo '{"tool_name": "Write", "tool_input": {"file_path": "/tmp/test-project/file.txt"}}' | bash hooks/run-hook.cmd hooks/protect-directories.sh && exit 1 || test $? -eq 2
+          echo '{"tool_name": "Write", "tool_input": {"file_path": "/tmp/test-project/file.txt"}}' | bash hooks/run-hook.cmd protect-directories.sh && exit 1 || test $? -eq 2
           echo "Cross-platform runner works"
 
   shellcheck:
