@@ -429,47 +429,47 @@ get_bash_target_paths() {
     # rm command
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\brm\s+(-[rRfiv]+\s+)*([^\s|;&]+)' | sed -E 's/\brm\s+(-[rRfiv]+\s+)*//g' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\brm\s+(-[rRfiv]+\s+)*([^ |;&]+)' | sed -E 's/\brm\s+(-[rRfiv]+\s+)*//g' | tr -d "'" | tr -d '"')
 
     # mv command (both source and dest)
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\bmv\s+(-[fiv]+\s+)*[^\s|;&]+\s+[^\s|;&]+' | sed -E 's/\bmv\s+(-[fiv]+\s+)*//g' | tr ' ' '\n' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\bmv\s+(-[fiv]+\s+)*[^ |;&]+\s+[^ |;&]+' | sed -E 's/\bmv\s+(-[fiv]+\s+)*//g' | tr ' ' '\n' | tr -d "'" | tr -d '"')
 
     # cp command (both source and dest)
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\bcp\s+(-[rRfiv]+\s+)*[^\s|;&]+\s+[^\s|;&]+' | sed -E 's/\bcp\s+(-[rRfiv]+\s+)*//g' | tr ' ' '\n' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\bcp\s+(-[rRfiv]+\s+)*[^ |;&]+\s+[^ |;&]+' | sed -E 's/\bcp\s+(-[rRfiv]+\s+)*//g' | tr ' ' '\n' | tr -d "'" | tr -d '"')
 
     # touch command
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\btouch\s+[^\s|;&]+' | sed 's/\btouch\s*//g' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\btouch\s+[^ |;&]+' | sed 's/\btouch\s*//g' | tr -d "'" | tr -d '"')
 
     # mkdir command
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\bmkdir\s+(-p\s+)?[^\s|;&]+' | sed -E 's/\bmkdir\s+(-p\s+)?//g' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\bmkdir\s+(-p\s+)?[^ |;&]+' | sed -E 's/\bmkdir\s+(-p\s+)?//g' | tr -d "'" | tr -d '"')
 
     # rmdir command
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\brmdir\s+[^\s|;&]+' | sed 's/\brmdir\s*//g' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\brmdir\s+[^ |;&]+' | sed 's/\brmdir\s*//g' | tr -d "'" | tr -d '"')
 
     # Output redirection > or >>
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '>\s*[^\s|;&>]+' | sed 's/>\s*//g' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '>\s*[^ |;&>]+' | sed 's/>\s*//g' | tr -d "'" | tr -d '"')
 
     # tee command
     while read -r match; do
         [[ -n "$match" && ! "$match" =~ ^- ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\btee\s+(-a\s+)?[^\s|;&]+' | sed -E 's/\btee\s+(-a\s+)?//g' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\btee\s+(-a\s+)?[^ |;&]+' | sed -E 's/\btee\s+(-a\s+)?//g' | tr -d "'" | tr -d '"')
 
     # dd command with of=
     while read -r match; do
         [[ -n "$match" ]] && paths+=("$match")
-    done < <(echo "$command" | grep -oE '\bof=[^\s|;&]+' | sed 's/of=//g' | tr -d "'" | tr -d '"')
+    done < <(echo "$command" | grep -oE '\bof=[^ |;&]+' | sed 's/of=//g' | tr -d "'" | tr -d '"')
 
     # Return unique paths
     printf '%s\n' "${paths[@]}" | sort -u | tr '\n' ' '
