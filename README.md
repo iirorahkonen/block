@@ -1,4 +1,4 @@
-# claude-block
+# Claude Block
 
 **Protect files from unwanted AI modifications.**
 
