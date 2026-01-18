@@ -7,13 +7,13 @@ File and directory protection for Claude Code using `.claude-block` marker files
 1. Register the marketplace:
 
 ```
-/plugin marketplace add iirorahkonen/claude-marketplace
+/plugin marketplace add iirorahkonen/claude-block-marketplace
 ```
 
 2. Install the plugin:
 
 ```
-/plugin install claude-block@claude-marketplace
+/plugin install claude-block@claude-block-marketplace
 ```
 
 ## Usage
