@@ -2,11 +2,11 @@
 
 **Protect sensitive files from accidental AI modifications.**
 
-Drop a `.claude-block` file in any directory to control what Claude can and cannot edit. Protect configs, secrets, migrations, or entire directories with simple pattern rules.
+Drop a `.claude-block` file in any directory to control what Claude can and cannot edit. Protect configs, lock files, migrations, or entire directories with simple pattern rules.
 
 ## Why use this?
 
-- **Prevent accidents** — Stop Claude from touching production configs, `.env` files, or database migrations
+- **Prevent accidents** — Stop Claude from touching critical configs, lock files, or database migrations
 - **Flexible control** — Block everything, allow specific patterns, or block specific patterns
 - **Guide Claude** — Custom messages explain why files are protected and what to do instead
 - **Zero friction** — Once set up, protection works automatically on every session
