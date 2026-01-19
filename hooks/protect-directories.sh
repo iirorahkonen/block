@@ -44,8 +44,18 @@ if ! command -v jq &> /dev/null; then
     exit 2
 fi
 
-# Read hook input from stdin
-HOOK_INPUT=$(cat)
+# Fix Windows paths in JSON input
+# Windows paths like C:\Users contain backslashes that are invalid JSON escapes
+# This function escapes all single backslashes to make the JSON valid
+# Already-escaped paths (\\) become (\\\\) but jq normalizes them back
+fix_windows_json_paths() {
+    # Escape all backslashes - Windows paths are the common case
+    # This handles both unescaped (C:\Users) and escaped (C:\\Users) paths
+    sed 's/\\/\\\\/g'
+}
+
+# Read hook input from stdin and fix Windows paths
+HOOK_INPUT=$(cat | fix_windows_json_paths)
 
 # Parse input JSON
 TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
