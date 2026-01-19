@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -28,7 +28,7 @@ jobs:
           filters: |
             versionable:
               - 'hooks/**'
-              - 'skills/**'
+              - 'commands/**'
               - 'GitVersion.yml'
 
       - name: Check for +semver in commit message
