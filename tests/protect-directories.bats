@@ -29,7 +29,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/src/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"BLOCKED"* ]]
 }
 
@@ -39,7 +39,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/src/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"BLOCKED"* ]]
 }
 
@@ -49,7 +49,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/src/deep/nested/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 # =============================================================================
@@ -69,7 +69,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.js")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"BLOCKED"* ]]
 }
 
@@ -88,7 +88,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/lib/file.ts")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "allowed list: allows multiple patterns" {
@@ -120,7 +120,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/config.secret")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"BLOCKED"* ]]
 }
 
@@ -138,7 +138,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/node_modules/package/dist/index.js")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "blocked list: multiple patterns all work" {
@@ -149,18 +149,18 @@ teardown() {
     # Test .lock file
     local input=$(make_edit_input "$TEST_DIR/project/yarn.lock")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Test .env file
     input=$(make_edit_input "$TEST_DIR/project/app.env")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Test dist directory
     mkdir -p "$TEST_DIR/project/dist"
     input=$(make_edit_input "$TEST_DIR/project/dist/bundle.js")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Non-blocked file should be allowed
     input=$(make_edit_input "$TEST_DIR/project/src/index.ts")
@@ -177,7 +177,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"This project is read-only for Claude."* ]]
 }
 
@@ -186,7 +186,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/.env.local")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"Environment files are sensitive!"* ]]
 }
 
@@ -199,14 +199,14 @@ teardown() {
     # Pattern-specific guide
     local input=$(make_edit_input "$TEST_DIR/project/api.secret")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"Secret files protected"* ]]
     [[ "$output" != *"General protection message"* ]]
 
     # Falls back to global guide for pattern without specific guide
     input=$(make_edit_input "$TEST_DIR/project/file.other")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"General protection message"* ]]
 }
 
@@ -219,7 +219,7 @@ teardown() {
     # Non-matching file should be blocked and show guide
     local input=$(make_edit_input "$TEST_DIR/project/app.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"Only test files can be edited"* ]]
 
     # Matching file should be allowed
@@ -237,7 +237,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"cannot specify both allowed and blocked"* ]]
 }
 
@@ -247,7 +247,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 # =============================================================================
@@ -259,7 +259,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/.block")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"Cannot modify"* ]]
 }
 
@@ -268,7 +268,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/.block.local")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"Cannot modify"* ]]
 }
 
@@ -277,7 +277,7 @@ teardown() {
     local input=$(make_bash_input "rm $TEST_DIR/project/.block")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"Cannot modify"* ]]
 }
 
@@ -290,7 +290,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "local file alone with blocked patterns blocks all" {
@@ -303,11 +303,11 @@ teardown() {
     # All files are blocked when only local file exists
     local input=$(make_edit_input "$TEST_DIR/project/app.test.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     input=$(make_edit_input "$TEST_DIR/project/app.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "local file extends main blocked patterns" {
@@ -318,11 +318,11 @@ teardown() {
     # Both patterns should be blocked
     local input=$(make_edit_input "$TEST_DIR/project/yarn.lock")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     input=$(make_edit_input "$TEST_DIR/project/app.test.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Non-blocked file should be allowed
     input=$(make_edit_input "$TEST_DIR/project/app.ts")
@@ -336,7 +336,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"Local guide"* ]]
     [[ "$output" != *"Main guide"* ]]
 }
@@ -348,11 +348,11 @@ teardown() {
     # Both patterns should be blocked
     local input=$(make_edit_input "$TEST_DIR/project/package.lock")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     input=$(make_edit_input "$TEST_DIR/project/api.secret")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Non-blocked file should be allowed
     input=$(make_edit_input "$TEST_DIR/project/config.json")
@@ -366,7 +366,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
     [[ "$output" == *"cannot mix allowed and blocked"* ]]
 }
 
@@ -378,7 +378,7 @@ teardown() {
     # .txt was allowed in main but not in local - should be blocked
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # .js is allowed in local - should be allowed
     input=$(make_edit_input "$TEST_DIR/project/file.js")
@@ -395,7 +395,7 @@ teardown() {
     local input=$(make_write_input "$TEST_DIR/project/new-file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "NotebookEdit tool is blocked in protected directory" {
@@ -403,7 +403,7 @@ teardown() {
     local input=$(make_notebook_input "$TEST_DIR/project/notebook.ipynb")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "unknown tools are allowed" {
@@ -424,7 +424,7 @@ teardown() {
     input=$(make_bash_input "rm $TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects rm -rf command target" {
@@ -433,7 +433,7 @@ teardown() {
     input=$(make_bash_input "rm -rf $TEST_DIR/project/dir")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects touch command target" {
@@ -442,7 +442,7 @@ teardown() {
     input=$(make_bash_input "touch $TEST_DIR/project/newfile.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects mv command targets" {
@@ -452,7 +452,7 @@ teardown() {
     input=$(make_bash_input "mv $TEST_DIR/other/file.txt $TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects cp command targets" {
@@ -462,7 +462,7 @@ teardown() {
     input=$(make_bash_input "cp $TEST_DIR/other/file.txt $TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects output redirection target" {
@@ -471,7 +471,7 @@ teardown() {
     input=$(make_bash_input "echo 'hello' > $TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects tee command target" {
@@ -480,7 +480,7 @@ teardown() {
     input=$(make_bash_input "echo 'hello' | tee $TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects tee -a append command target" {
@@ -489,7 +489,7 @@ teardown() {
     input=$(make_bash_input "echo 'hello' | tee -a $TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects mkdir command target" {
@@ -498,7 +498,7 @@ teardown() {
     input=$(make_bash_input "mkdir -p $TEST_DIR/project/newdir")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "allows read-only bash commands" {
@@ -526,7 +526,7 @@ teardown() {
     input=$(make_bash_input "rmdir $TEST_DIR/project/emptydir")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects append redirection target" {
@@ -535,7 +535,7 @@ teardown() {
     input=$(make_bash_input "echo 'hello' >> $TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "detects dd command with of= target" {
@@ -544,7 +544,7 @@ teardown() {
     input=$(make_bash_input "dd if=/dev/zero of=$TEST_DIR/project/file.bin bs=1 count=1")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 # =============================================================================
@@ -558,7 +558,7 @@ teardown() {
     # Should match direct child
     local input=$(make_edit_input "$TEST_DIR/project/src/index.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Should NOT match nested file (single * doesn't cross directories)
     input=$(make_edit_input "$TEST_DIR/project/src/deep/nested.ts")
@@ -573,7 +573,7 @@ teardown() {
     # Should match nested file
     local input=$(make_edit_input "$TEST_DIR/project/src/deep/nested/file.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "question mark matches single character" {
@@ -582,7 +582,7 @@ teardown() {
     # Should match file1.txt
     local input=$(make_edit_input "$TEST_DIR/project/file1.txt")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Should NOT match file12.txt
     input=$(make_edit_input "$TEST_DIR/project/file12.txt")
@@ -596,7 +596,7 @@ teardown() {
     # Should match
     local input=$(make_edit_input "$TEST_DIR/project/app.config.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # Should NOT match (dots are literal)
     input=$(make_edit_input "$TEST_DIR/project/appXconfigXts")
@@ -629,7 +629,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/my project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "closest .block file takes precedence" {
@@ -646,7 +646,7 @@ teardown() {
     # Non-allowed file should be blocked
     input=$(make_edit_input "$TEST_DIR/project/src/code.js")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 # =============================================================================
@@ -663,12 +663,12 @@ teardown() {
     # File in src/ should be blocked
     local input=$(make_edit_input "$TEST_DIR/project/src/index.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # File in src/components/ should be blocked
     input=$(make_edit_input "$TEST_DIR/project/src/components/Button.tsx")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # File outside src/ should be allowed
     input=$(make_edit_input "$TEST_DIR/project/README.md")
@@ -684,7 +684,7 @@ teardown() {
     # File in components/ should be blocked (relative to src/)
     local input=$(make_edit_input "$TEST_DIR/project/src/components/Button.tsx")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # File directly in src/ should be allowed
     input=$(make_edit_input "$TEST_DIR/project/src/index.ts")
@@ -702,12 +702,12 @@ teardown() {
     # config.json at root should be blocked
     local input=$(make_edit_input "$TEST_DIR/project/config.json")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # config.json in nested dir should be blocked
     input=$(make_edit_input "$TEST_DIR/project/deep/nested/dir/config.json")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 
     # other.json should be allowed
     input=$(make_edit_input "$TEST_DIR/project/other.json")
@@ -730,7 +730,7 @@ teardown() {
     # File in dashboard feature should be blocked
     input=$(make_edit_input "$TEST_DIR/project/src/features/dashboard/index.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "multiple directory levels with different configs" {
@@ -748,7 +748,7 @@ teardown() {
     # Generated file is blocked by src's .block
     input=$(make_edit_input "$TEST_DIR/project/src/generated/types.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 # =============================================================================
@@ -770,7 +770,7 @@ teardown() {
     input=$(printf '{"tool_name":"Edit","tool_input":{"file_path":"%s\\project\\src\\file.txt"}}' "$TEST_DIR")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "properly escaped Windows paths still work" {
@@ -781,7 +781,7 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 @test "forward slash paths work unchanged" {
@@ -790,14 +790,14 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run run_hook_with_input "$input"
-    [ "$status" -eq 2 ]
+    is_blocked
 }
 
 # =============================================================================
 # Protection Guarantee Tests (verifies files are never modified when blocked)
 # =============================================================================
 
-@test "hook exit code 2 prevents any file modification" {
+@test "hook block decision prevents any file modification" {
     # Create protected directory with existing file
     create_block_file "$TEST_DIR/project"
     mkdir -p "$TEST_DIR/project"
@@ -806,8 +806,8 @@ teardown() {
     local input=$(make_edit_input "$TEST_DIR/project/existing.txt")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
 
-    # Hook must exit with code 2 (block)
-    [ "$status" -eq 2 ]
+    # Hook must output JSON block decision
+    is_blocked
 
     # File content must be unchanged (hook runs BEFORE tool execution)
     [ "$(cat "$TEST_DIR/project/existing.txt")" = "original content" ]
@@ -820,7 +820,7 @@ teardown() {
     local input=$(make_write_input "$TEST_DIR/project/new-file.txt")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
 
-    [ "$status" -eq 2 ]
+    is_blocked
     # File must NOT exist (hook prevents creation)
     [ ! -f "$TEST_DIR/project/new-file.txt" ]
 }
@@ -833,7 +833,7 @@ teardown() {
     local input=$(make_bash_input "rm $TEST_DIR/project/keep.txt")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
 
-    [ "$status" -eq 2 ]
+    is_blocked
     # File must still exist
     [ -f "$TEST_DIR/project/keep.txt" ]
 }

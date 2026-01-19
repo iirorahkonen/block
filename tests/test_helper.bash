@@ -144,3 +144,18 @@ assert_output_not_contains() {
         return 1
     fi
 }
+
+# Check if hook output indicates blocking (JSON format for Claude Code)
+# Returns 0 if blocked, 1 if not blocked
+is_blocked() {
+    [[ "$output" == *'"decision"'*'"block"'* ]]
+}
+
+# Assert that operation was blocked (for Claude Code JSON hook output)
+assert_blocked() {
+    if ! is_blocked; then
+        echo "Expected operation to be BLOCKED"
+        echo "Output: $output"
+        return 1
+    fi
+}

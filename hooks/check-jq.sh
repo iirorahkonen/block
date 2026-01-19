@@ -3,8 +3,7 @@
 # Warns user if jq is missing (required for directory protection)
 
 if ! command -v jq &> /dev/null; then
-    echo "WARNING: jq is not installed. Directory protection (.block) requires jq." >&2
-    echo "File operations in protected directories will be blocked until jq is installed." >&2
+    printf '{"systemMessage": "⚠️  jq is not installed. Directory protection (.block) requires jq. File operations in protected directories will be blocked until jq is installed."}\n'
 fi
 
 # Always exit 0 - don't block session start, just warn

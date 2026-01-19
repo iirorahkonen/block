@@ -39,9 +39,9 @@ LOCAL_MARKER_FILE_NAME=".block.local"
 
 # Check if jq is available - FAIL CLOSED if missing
 if ! command -v jq &> /dev/null; then
-    echo "BLOCKED: jq is required for directory protection hook but is not installed." >&2
-    echo "Install jq to enable file operations, or remove .block files to disable protection." >&2
-    exit 2
+    # Output JSON block response when jq is missing
+    echo '{"decision": "block", "reason": "jq is required for directory protection hook but is not installed. Install jq to enable file operations."}'
+    exit 0
 fi
 
 # Fix Windows paths in JSON input
@@ -473,60 +473,65 @@ test_is_marker_file() {
     [[ "$filename" == "$MARKER_FILE_NAME" || "$filename" == "$LOCAL_MARKER_FILE_NAME" ]]
 }
 
-# Block marker file removal
+# Block marker file removal - outputs JSON to stdout for Claude Code hooks
 block_marker_removal() {
     local target_file="$1"
     local filename
     filename=$(basename "$target_file")
 
-    cat >&2 << EOF
-BLOCKED: Cannot modify $filename
+    local message="BLOCKED: Cannot modify $filename
 
 Target file: $target_file
 
 The $filename file is protected and cannot be modified or removed by Claude.
 This is a safety mechanism to ensure directory protection remains in effect.
 
-To remove protection, manually delete the file using your file manager or terminal.
-EOF
-    exit 2
+To remove protection, manually delete the file using your file manager or terminal."
+
+    # Output JSON to stdout - this is what Claude Code hooks expect
+    jq -n --arg reason "$message" '{"decision": "block", "reason": $reason}'
+    exit 0
 }
 
-# Block config error
+# Block config error - outputs JSON to stdout for Claude Code hooks
 block_config_error() {
     local marker_path="$1"
     local error_message="$2"
 
-    cat >&2 << EOF
-BLOCKED: Invalid $MARKER_FILE_NAME configuration
+    local message="BLOCKED: Invalid $MARKER_FILE_NAME configuration
 
 Marker file: $marker_path
 Error: $error_message
 
 Please fix the configuration file. Valid formats:
   - Empty file or {} = block everything
-  - { "allowed": ["pattern"] } = only allow matching paths
-  - { "blocked": ["pattern"] } = only block matching paths
-EOF
-    exit 2
+  - { \"allowed\": [\"pattern\"] } = only allow matching paths
+  - { \"blocked\": [\"pattern\"] } = only block matching paths"
+
+    # Output JSON to stdout - this is what Claude Code hooks expect
+    jq -n --arg reason "$message" '{"decision": "block", "reason": $reason}'
+    exit 0
 }
 
-# Block with message
+# Block with message - outputs JSON to stdout for Claude Code hooks
 block_with_message() {
     local target_file="$1"
     local marker_path="$2"
     local reason="$3"
     local guide="$4"
 
-    # If guide is provided, just show the guide text
+    local message
+    # If guide is provided, use the guide text
     if [[ -n "$guide" ]]; then
-        echo "$guide" >&2
-        exit 2
+        message="$guide"
+    else
+        # Otherwise use short default message
+        message="BLOCKED by .block: $marker_path"
     fi
 
-    # Otherwise show short default message
-    echo "BLOCKED by .block: $marker_path" >&2
-    exit 2
+    # Output JSON to stdout - this is what Claude Code hooks expect
+    jq -n --arg reason "$message" '{"decision": "block", "reason": $reason}'
+    exit 0
 }
 
 # Test if operation should be blocked
