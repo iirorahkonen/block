@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" check-jq.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/check-jq.cmd",
             "timeout": 5000
           }
         ]
@@ -15,11 +15,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|NotebookEdit|Bash",
+        "matcher": "^(Edit|Write|NotebookEdit|Bash)$",
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd\" protect-directories.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/protect-directories.cmd",
             "timeout": 5000
           }
         ]

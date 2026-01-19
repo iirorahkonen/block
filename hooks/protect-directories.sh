@@ -34,15 +34,34 @@
 #   ** = any characters including path separator (recursive)
 #   ? = single character
 
+# DEBUG LOGGING - Get the script directory for the debug log path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEBUG_LOG="$SCRIPT_DIR/../tests/manual/debug-output/protect-directories-sh.log"
+
+# Create debug directory if it doesn't exist
+mkdir -p "$(dirname "$DEBUG_LOG")" 2>/dev/null
+
+debug_log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$DEBUG_LOG" 2>&1
+}
+
+debug_log "===== protect-directories.sh INVOKED ====="
+debug_log "Script directory: $SCRIPT_DIR"
+debug_log "Current working directory: $(pwd)"
+debug_log "CLAUDE_PLUGIN_ROOT: ${CLAUDE_PLUGIN_ROOT:-not set}"
+
 MARKER_FILE_NAME=".block"
 LOCAL_MARKER_FILE_NAME=".block.local"
 
 # Check if jq is available - FAIL CLOSED if missing
 if ! command -v jq &> /dev/null; then
-    echo "BLOCKED: jq is required for directory protection hook but is not installed." >&2
-    echo "Install jq to enable file operations, or remove .block files to disable protection." >&2
-    exit 2
+    # Output JSON block response when jq is missing
+    debug_log "ERROR: jq not found - blocking operation"
+    echo '{"decision": "block", "reason": "jq is required for directory protection hook but is not installed. Install jq to enable file operations."}'
+    exit 0
 fi
+
+debug_log "jq found: $(command -v jq)"
 
 # Fix Windows paths in JSON input
 # Windows paths like C:\Users contain backslashes that are invalid JSON escapes
@@ -54,12 +73,16 @@ fix_windows_json_paths() {
     sed 's/\\/\\\\/g'
 }
 
-# Read hook input from stdin and fix Windows paths
-HOOK_INPUT=$(cat | fix_windows_json_paths)
+# Read hook input from stdin (Claude Code sends valid JSON, no preprocessing needed)
+debug_log "Reading stdin for hook input..."
+HOOK_INPUT=$(cat)
+debug_log "Input received (first 500 chars): ${HOOK_INPUT:0:500}"
 
 # Parse input JSON
-TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
+TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>&1)
+debug_log "Parsed TOOL_NAME: '$TOOL_NAME'"
 if [[ -z "$TOOL_NAME" ]]; then
+    debug_log "TOOL_NAME is empty - allowing operation (parse error or no tool)"
     exit 0  # Allow on parse error
 fi
 
@@ -473,60 +496,65 @@ test_is_marker_file() {
     [[ "$filename" == "$MARKER_FILE_NAME" || "$filename" == "$LOCAL_MARKER_FILE_NAME" ]]
 }
 
-# Block marker file removal
+# Block marker file removal - outputs JSON to stdout for Claude Code hooks
 block_marker_removal() {
     local target_file="$1"
     local filename
     filename=$(basename "$target_file")
 
-    cat >&2 << EOF
-BLOCKED: Cannot modify $filename
+    local message="BLOCKED: Cannot modify $filename
 
 Target file: $target_file
 
 The $filename file is protected and cannot be modified or removed by Claude.
 This is a safety mechanism to ensure directory protection remains in effect.
 
-To remove protection, manually delete the file using your file manager or terminal.
-EOF
-    exit 2
+To remove protection, manually delete the file using your file manager or terminal."
+
+    # Output JSON to stdout - this is what Claude Code hooks expect
+    jq -n --arg reason "$message" '{"decision": "block", "reason": $reason}'
+    exit 0
 }
 
-# Block config error
+# Block config error - outputs JSON to stdout for Claude Code hooks
 block_config_error() {
     local marker_path="$1"
     local error_message="$2"
 
-    cat >&2 << EOF
-BLOCKED: Invalid $MARKER_FILE_NAME configuration
+    local message="BLOCKED: Invalid $MARKER_FILE_NAME configuration
 
 Marker file: $marker_path
 Error: $error_message
 
 Please fix the configuration file. Valid formats:
   - Empty file or {} = block everything
-  - { "allowed": ["pattern"] } = only allow matching paths
-  - { "blocked": ["pattern"] } = only block matching paths
-EOF
-    exit 2
+  - { \"allowed\": [\"pattern\"] } = only allow matching paths
+  - { \"blocked\": [\"pattern\"] } = only block matching paths"
+
+    # Output JSON to stdout - this is what Claude Code hooks expect
+    jq -n --arg reason "$message" '{"decision": "block", "reason": $reason}'
+    exit 0
 }
 
-# Block with message
+# Block with message - outputs JSON to stdout for Claude Code hooks
 block_with_message() {
     local target_file="$1"
     local marker_path="$2"
     local reason="$3"
     local guide="$4"
 
-    # If guide is provided, just show the guide text
+    local message
+    # If guide is provided, use the guide text
     if [[ -n "$guide" ]]; then
-        echo "$guide" >&2
-        exit 2
+        message="$guide"
+    else
+        # Otherwise use short default message
+        message="BLOCKED by .block: $marker_path"
     fi
 
-    # Otherwise show short default message
-    echo "BLOCKED by .block: $marker_path" >&2
-    exit 2
+    # Output JSON to stdout - this is what Claude Code hooks expect
+    jq -n --arg reason "$message" '{"decision": "block", "reason": $reason}'
+    exit 0
 }
 
 # Test if operation should be blocked
@@ -627,21 +655,27 @@ test_should_block() {
 # Main logic - determine paths to check based on tool type
 paths_to_check=()
 
+debug_log "Processing tool: $TOOL_NAME"
+
 case "$TOOL_NAME" in
     "Edit")
         path=$(echo "$HOOK_INPUT" | jq -r '.tool_input.file_path // empty')
+        debug_log "Edit tool - file_path: '$path'"
         [[ -n "$path" ]] && paths_to_check+=("$path")
         ;;
     "Write")
         path=$(echo "$HOOK_INPUT" | jq -r '.tool_input.file_path // empty')
+        debug_log "Write tool - file_path: '$path'"
         [[ -n "$path" ]] && paths_to_check+=("$path")
         ;;
     "NotebookEdit")
         path=$(echo "$HOOK_INPUT" | jq -r '.tool_input.notebook_path // empty')
+        debug_log "NotebookEdit tool - notebook_path: '$path'"
         [[ -n "$path" ]] && paths_to_check+=("$path")
         ;;
     "Bash")
         command=$(echo "$HOOK_INPUT" | jq -r '.tool_input.command // empty')
+        debug_log "Bash tool - command: '$command'"
         if [[ -n "$command" ]]; then
             while read -r bash_path; do
                 [[ -n "$bash_path" ]] && paths_to_check+=("$bash_path")
@@ -649,43 +683,65 @@ case "$TOOL_NAME" in
         fi
         ;;
     *)
+        debug_log "Unknown tool '$TOOL_NAME' - allowing operation"
         exit 0  # Allow unknown tools
         ;;
 esac
+
+debug_log "Paths to check: ${paths_to_check[*]}"
+debug_log "Number of paths: ${#paths_to_check[@]}"
 
 # Check each path for protection
 for path in "${paths_to_check[@]}"; do
     [[ -z "$path" ]] && continue
 
+    debug_log "Checking path: '$path'"
+
     # First check if trying to modify/delete an existing marker file
     if test_is_marker_file "$path"; then
         full_path=$(get_full_path "$path")
+        debug_log "Path is a marker file: '$full_path'"
         # Only block if the marker file already exists (allow creation, block modification/deletion)
         if [[ -f "$full_path" ]]; then
+            debug_log "Marker file exists - BLOCKING modification"
             block_marker_removal "$full_path"
         fi
     fi
 
     # Then check if the target is in a protected directory
+    debug_log "Checking for directory protection..."
     protection_info=$(test_directory_protected "$path")
+    debug_log "Protection info: ${protection_info:-none}"
+
     if [[ -n "$protection_info" ]]; then
         target_file=$(echo "$protection_info" | jq -r '.target_file')
         marker_path=$(echo "$protection_info" | jq -r '.marker_path')
+        debug_log "Found protection - target: '$target_file', marker: '$marker_path'"
 
         block_result=$(test_should_block "$target_file" "$protection_info")
+        debug_log "Block result: $block_result"
 
         should_block=$(echo "$block_result" | jq -r '.should_block')
         is_config_error=$(echo "$block_result" | jq -r '.is_config_error')
         reason=$(echo "$block_result" | jq -r '.reason')
         result_guide=$(echo "$block_result" | jq -r '.guide')
 
+        debug_log "should_block: $should_block, is_config_error: $is_config_error, reason: $reason"
+
         if [[ "$is_config_error" == "true" ]]; then
+            debug_log "BLOCKING due to config error"
             block_config_error "$marker_path" "$reason"
         elif [[ "$should_block" == "true" ]]; then
+            debug_log "BLOCKING operation"
             block_with_message "$target_file" "$marker_path" "$reason" "$result_guide"
+        else
+            debug_log "Protection found but path is allowed"
         fi
+    else
+        debug_log "No protection found for path"
     fi
 done
 
+debug_log "All paths checked - allowing operation"
 # No protection found, allow the operation
 exit 0
