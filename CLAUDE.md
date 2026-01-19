@@ -15,7 +15,7 @@ The plugin uses Claude Code's hook system:
 Key files:
 - `hooks/hooks.json` - Hook configuration that triggers protection checks
 - `hooks/protect-directories.sh` - Main protection logic (bash script)
-- `skills/block/SKILL.md` - Interactive skill for creating `.block` files
+- `commands/create.md` - Interactive command for creating `.block` files
 - `.claude-plugin/plugin.json` - Plugin metadata
 
 ## Testing the Plugin

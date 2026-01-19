@@ -1,11 +1,10 @@
 ---
-name: create
 description: Create and manage .block files for directory protection. Use when you need to protect directories from Claude modifications.
 ---
 
 # .block Creator
 
-This skill helps you create .block and .block.local files to protect directories from Claude Code modifications.
+This command helps you create .block and .block.local files to protect directories from Claude Code modifications.
 
 ## When to Use
 
