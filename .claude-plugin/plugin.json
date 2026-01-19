@@ -2,6 +2,7 @@
   "name": "block",
   "description": "File and directory protection for Claude Code using .block marker files with pattern matching",
   "version": "1.0.1",
+  "skills": "./skills/",
   "author": {
     "name": "Iiro Rahkonen"
   },

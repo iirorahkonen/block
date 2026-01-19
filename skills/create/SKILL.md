@@ -1,5 +1,5 @@
 ---
-name: block
+name: create
 description: Create and manage .block files for directory protection. Use when you need to protect directories from Claude modifications.
 ---
 
