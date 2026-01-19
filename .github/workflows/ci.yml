@@ -297,7 +297,7 @@ jobs:
       - name: Checkout marketplace repository
         uses: actions/checkout@v6
         with:
-          repository: iirorahkonen/block-marketplace
+          repository: kodroi/block-marketplace
           token: ${{ secrets.MARKETPLACE_TOKEN }}
           path: marketplace
 

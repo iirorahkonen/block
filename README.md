@@ -16,7 +16,7 @@ Drop a `.block` file in any directory to control what Claude can and cannot edit
 1. Register the marketplace:
 
 ```
-/plugin marketplace add iirorahkonen/block-marketplace
+/plugin marketplace add kodroi/block-marketplace
 ```
 
 2. Install the plugin:
@@ -27,7 +27,7 @@ Drop a `.block` file in any directory to control what Claude can and cannot edit
 
 ## Usage
 
-Use the `/block:create` skill to interactively create a `.block` file:
+Use the `/block:create` command to interactively create a `.block` file:
 
 ```
 /block:create
@@ -127,7 +127,7 @@ For personal or machine-specific protection rules that shouldn't be committed to
 
 ```json
 {
-  "blocked": [".personal-config", "local-secrets/**/*"]
+  "blocked": [".env.local", ".env.*.local", "appsettings.Development.json"]
 }
 ```
 
