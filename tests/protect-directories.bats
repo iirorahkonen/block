@@ -15,7 +15,7 @@ teardown() {
 # Basic Protection Tests
 # =============================================================================
 
-@test "allows operations when no .claude-block file exists" {
+@test "allows operations when no .block file exists" {
     mkdir -p "$TEST_DIR/project/src"
     local input=$(make_edit_input "$TEST_DIR/project/src/file.txt")
 
@@ -23,7 +23,7 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
-@test "blocks operations when empty .claude-block file exists" {
+@test "blocks operations when empty .block file exists" {
     create_block_file "$TEST_DIR/project"
     mkdir -p "$TEST_DIR/project/src"
     local input=$(make_edit_input "$TEST_DIR/project/src/file.txt")
@@ -33,7 +33,7 @@ teardown() {
     [[ "$output" == *"BLOCKED"* ]]
 }
 
-@test "blocks operations when .claude-block contains empty JSON object" {
+@test "blocks operations when .block contains empty JSON object" {
     create_block_file "$TEST_DIR/project" '{}'
     mkdir -p "$TEST_DIR/project/src"
     local input=$(make_edit_input "$TEST_DIR/project/src/file.txt")
@@ -43,7 +43,7 @@ teardown() {
     [[ "$output" == *"BLOCKED"* ]]
 }
 
-@test "blocks nested directory when parent has .claude-block" {
+@test "blocks nested directory when parent has .block" {
     create_block_file "$TEST_DIR/project"
     mkdir -p "$TEST_DIR/project/src/deep/nested"
     local input=$(make_edit_input "$TEST_DIR/project/src/deep/nested/file.txt")
@@ -243,7 +243,7 @@ teardown() {
 
 @test "treats invalid JSON as block all" {
     mkdir -p "$TEST_DIR/project"
-    echo "this is not json" > "$TEST_DIR/project/.claude-block"
+    echo "this is not json" > "$TEST_DIR/project/.block"
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
@@ -254,27 +254,27 @@ teardown() {
 # Marker File Protection Tests
 # =============================================================================
 
-@test "blocks modification of .claude-block file" {
+@test "blocks modification of .block file" {
     create_block_file "$TEST_DIR/project" '{"allowed": ["*"]}'  # Even with allow all pattern
-    local input=$(make_edit_input "$TEST_DIR/project/.claude-block")
+    local input=$(make_edit_input "$TEST_DIR/project/.block")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
     [ "$status" -eq 2 ]
     [[ "$output" == *"Cannot modify"* ]]
 }
 
-@test "blocks modification of .claude-block.local file" {
+@test "blocks modification of .block.local file" {
     create_local_block_file "$TEST_DIR/project" '{}'
-    local input=$(make_edit_input "$TEST_DIR/project/.claude-block.local")
+    local input=$(make_edit_input "$TEST_DIR/project/.block.local")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
     [ "$status" -eq 2 ]
     [[ "$output" == *"Cannot modify"* ]]
 }
 
-@test "blocks rm command targeting .claude-block" {
+@test "blocks rm command targeting .block" {
     create_block_file "$TEST_DIR/project"
-    local input=$(make_bash_input "rm $TEST_DIR/project/.claude-block")
+    local input=$(make_bash_input "rm $TEST_DIR/project/.block")
 
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
     [ "$status" -eq 2 ]
@@ -294,9 +294,9 @@ teardown() {
 }
 
 @test "local file alone with blocked patterns blocks all" {
-    # Note: When only a local file exists without a main .claude-block file,
+    # Note: When only a local file exists without a main .block file,
     # the merge logic treats the missing main as "block all", so all operations
-    # are blocked. To use local blocked patterns, a main .claude-block file
+    # are blocked. To use local blocked patterns, a main .block file
     # with blocked patterns must also exist.
     create_local_block_file "$TEST_DIR/project" '{"blocked": ["*.test.ts"]}'
 
@@ -632,7 +632,7 @@ teardown() {
     [ "$status" -eq 2 ]
 }
 
-@test "closest .claude-block file takes precedence" {
+@test "closest .block file takes precedence" {
     # Parent directory blocks everything
     create_block_file "$TEST_DIR/project"
     # Child directory allows .txt files
@@ -653,8 +653,8 @@ teardown() {
 # Path Pattern Relative Directory Tests
 # =============================================================================
 
-@test "patterns are relative to .claude-block directory - root level" {
-    # .claude-block at project root with blocked pattern for src/
+@test "patterns are relative to .block directory - root level" {
+    # .block at project root with blocked pattern for src/
     # Note: src/** matches everything under src/ (files and subdirs)
     #       src/**/* only matches files in subdirectories (requires at least one subdir level)
     create_block_file "$TEST_DIR/project" '{"blocked": ["src/**"]}'
@@ -676,8 +676,8 @@ teardown() {
     [ "$status" -eq 0 ]
 }
 
-@test "patterns are relative to .claude-block directory - nested level" {
-    # .claude-block inside src/ directory - patterns relative to src/
+@test "patterns are relative to .block directory - nested level" {
+    # .block inside src/ directory - patterns relative to src/
     mkdir -p "$TEST_DIR/project/src/components"
     create_block_file "$TEST_DIR/project/src" '{"blocked": ["components/**"]}'
 
@@ -745,7 +745,7 @@ teardown() {
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
     [ "$status" -eq 0 ]
 
-    # Generated file is blocked by src's .claude-block
+    # Generated file is blocked by src's .block
     input=$(make_edit_input "$TEST_DIR/project/src/generated/types.ts")
     run bash -c "echo '$input' | bash '$HOOKS_DIR/protect-directories.sh'"
     [ "$status" -eq 2 ]

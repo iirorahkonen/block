@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Claude Code plugin that provides file and directory protection using `.claude-block` configuration files. When installed, the plugin intercepts file modification operations (Edit, Write, NotebookEdit, Bash) and blocks them based on protection rules.
+This is a Claude Code plugin that provides file and directory protection using `.block` configuration files. When installed, the plugin intercepts file modification operations (Edit, Write, NotebookEdit, Bash) and blocks them based on protection rules.
 
 ## Architecture
 
@@ -15,14 +15,14 @@ The plugin uses Claude Code's hook system:
 Key files:
 - `hooks/hooks.json` - Hook configuration that triggers protection checks
 - `hooks/protect-directories.sh` - Main protection logic (bash script)
-- `skills/claude-block/SKILL.md` - Interactive skill for creating `.claude-block` files
+- `skills/block/SKILL.md` - Interactive skill for creating `.block` files
 - `.claude-plugin/plugin.json` - Plugin metadata
 
 ## Testing the Plugin
 
 To test protection locally:
 1. Ensure `jq` is installed
-2. Create a test directory with a `.claude-block` file
+2. Create a test directory with a `.block` file
 3. Attempt to modify files in that directory - operations should be blocked
 
 ## Git Worktrees

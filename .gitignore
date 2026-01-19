@@ -3,7 +3,7 @@
 .claude/
 
 # Local protection configuration files (not committed)
-.claude-block.local
+.block.local
 
 # Test dependencies (downloaded during test run)
 tests/bats-core/

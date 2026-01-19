@@ -1,5 +1,5 @@
 #!/bin/bash
-# Test helper functions for claude-block hook tests
+# Test helper functions for block hook tests
 
 # Path to hooks directory
 HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../hooks" && pwd)"
@@ -26,29 +26,29 @@ teardown_test_dir() {
     fi
 }
 
-# Create a .claude-block file with given content
+# Create a .block file with given content
 create_block_file() {
     local dir="${1:-.}"
     local content="${2:-}"
 
     mkdir -p "$dir"
     if [[ -n "$content" ]]; then
-        echo "$content" > "$dir/.claude-block"
+        echo "$content" > "$dir/.block"
     else
-        touch "$dir/.claude-block"
+        touch "$dir/.block"
     fi
 }
 
-# Create a .claude-block.local file with given content
+# Create a .block.local file with given content
 create_local_block_file() {
     local dir="${1:-.}"
     local content="${2:-}"
 
     mkdir -p "$dir"
     if [[ -n "$content" ]]; then
-        echo "$content" > "$dir/.claude-block.local"
+        echo "$content" > "$dir/.block.local"
     else
-        touch "$dir/.claude-block.local"
+        touch "$dir/.block.local"
     fi
 }
 

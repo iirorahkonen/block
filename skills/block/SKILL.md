@@ -1,21 +1,21 @@
 ---
-name: claude-block
-description: Create and manage .claude-block files for directory protection. Use when you need to protect directories from Claude modifications.
+name: block
+description: Create and manage .block files for directory protection. Use when you need to protect directories from Claude modifications.
 ---
 
-# .claude-block Creator
+# .block Creator
 
-This skill helps you create .claude-block and .claude-block.local files to protect directories from Claude Code modifications.
+This skill helps you create .block and .block.local files to protect directories from Claude Code modifications.
 
 ## When to Use
 
 - User wants to protect a directory from Claude modifications
-- User asks about .claude-block files
+- User asks about .block files
 - User wants to restrict which files Claude can edit
 - User says "lock", "protect", or "restrict" in context of files/directories
 - User wants local/personal protection rules that aren't committed to git
 
-## .claude-block Format Reference
+## .block Format Reference
 
 ### Block All (Empty or `{}`)
 ```json
@@ -66,8 +66,8 @@ Use AskUserQuestion to determine whether to create a main or local file:
 Question: "Should this be a shared or local configuration?"
 Header: "File type"
 Options:
-1. "Shared (.claude-block)" - "Committed to git, shared with team"
-2. "Local (.claude-block.local)" - "Not committed, personal/machine-specific rules"
+1. "Shared (.block)" - "Committed to git, shared with team"
+2. "Local (.block.local)" - "Not committed, personal/machine-specific rules"
 ```
 
 ### Step 2: Ask Protection Mode
@@ -129,8 +129,8 @@ If the user provides a message, include it. If they say no or skip, omit the gui
 Based on the collected information, generate the configuration file.
 
 **File name:**
-- Shared: `.claude-block`
-- Local: `.claude-block.local`
+- Shared: `.block`
+- Local: `.block.local`
 
 **Block All Mode:**
 ```json
@@ -157,15 +157,15 @@ Write the file to the specified location using the Write tool.
 
 ### Step 7: Add to .gitignore (for local files only)
 
-If creating a `.claude-block.local` file, check if `.claude-block.local` is already in the repository's `.gitignore`. If not, offer to add it:
+If creating a `.block.local` file, check if `.block.local` is already in the repository's `.gitignore`. If not, offer to add it:
 
 1. Look for `.gitignore` in the repository root (use git to find the root if needed)
-2. Check if `.claude-block.local` is already listed
-3. If not present, append `.claude-block.local` to the `.gitignore` file
+2. Check if `.block.local` is already listed
+3. If not present, append `.block.local` to the `.gitignore` file
 
 Use AskUserQuestion if unsure:
 ```
-Question: "Add .claude-block.local to .gitignore?"
+Question: "Add .block.local to .gitignore?"
 Header: "Gitignore"
 Options:
 1. "Yes (Recommended)" - "Prevent local config from being committed"

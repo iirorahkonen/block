@@ -1,8 +1,8 @@
-# Claude Block
+# Block
 
 **A Claude Code plugin to protect files from unwanted modifications.**
 
-Drop a `.claude-block` file in any directory to control what Claude can and cannot edit. Protect configs, lock files, migrations, or entire directories with simple pattern rules.
+Drop a `.block` file in any directory to control what Claude can and cannot edit. Protect configs, lock files, migrations, or entire directories with simple pattern rules.
 
 ## Why use this?
 
@@ -16,28 +16,28 @@ Drop a `.claude-block` file in any directory to control what Claude can and cann
 1. Register the marketplace:
 
 ```
-/plugin marketplace add iirorahkonen/claude-block-marketplace
+/plugin marketplace add iirorahkonen/block-marketplace
 ```
 
 2. Install the plugin:
 
 ```
-/plugin install claude-block@claude-block-marketplace
+/plugin install block@block-marketplace
 ```
 
 ## Usage
 
-Use the `/claude-block` skill to interactively create a `.claude-block` file:
+Use the `/block` skill to interactively create a `.block` file:
 
 ```
-/claude-block
+/block
 ```
 
-Or create a `.claude-block` file manually in any directory you want to protect.
+Or create a `.block` file manually in any directory you want to protect.
 
-## .claude-block Format
+## .block Format
 
-The `.claude-block` file uses JSON format with three modes:
+The `.block` file uses JSON format with three modes:
 
 ### Block All (Default)
 
@@ -123,7 +123,7 @@ Keep Claude focused on specific directories during feature work:
 
 ## Local Configuration Files
 
-For personal or machine-specific protection rules that shouldn't be committed to git, use `.claude-block.local`:
+For personal or machine-specific protection rules that shouldn't be committed to git, use `.block.local`:
 
 ```json
 {
@@ -131,7 +131,7 @@ For personal or machine-specific protection rules that shouldn't be committed to
 }
 ```
 
-Add `.claude-block.local` to your `.gitignore`.
+Add `.block.local` to your `.gitignore`.
 
 When both files exist in the same directory:
 - Blocked patterns are combined (union)
@@ -140,9 +140,9 @@ When both files exist in the same directory:
 
 ## How It Works
 
-The plugin hooks into Claude's file operations. When Claude tries to modify a file, it checks for `.claude-block` files in the target directory and parents, then allows or blocks based on your rules.
+The plugin hooks into Claude's file operations. When Claude tries to modify a file, it checks for `.block` files in the target directory and parents, then allows or blocks based on your rules.
 
-- `.claude-block` files themselves are always protected
+- `.block` files themselves are always protected
 - Protection cascades to all subdirectories
 - Closest configuration to the target file takes precedence
 

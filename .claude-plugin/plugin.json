@@ -1,11 +1,11 @@
 {
-  "name": "claude-block",
-  "description": "File and directory protection for Claude Code using .claude-block marker files with pattern matching",
+  "name": "block",
+  "description": "File and directory protection for Claude Code using .block marker files with pattern matching",
   "version": "1.0.1",
   "author": {
     "name": "Iiro Rahkonen"
   },
-  "repository": "https://github.com/iiro/claude-block",
+  "repository": "https://github.com/iirorahkonen/block",
   "license": "MIT",
   "keywords": [
     "protection",

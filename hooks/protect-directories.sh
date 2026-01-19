@@ -1,10 +1,10 @@
 #!/bin/bash
 # Claude Code Directory Protection Hook
-# Blocks file modifications when .claude-block or .claude-block.local exists in target directory or parent
+# Blocks file modifications when .block or .block.local exists in target directory or parent
 #
 # Configuration files:
-#   .claude-block       - Main configuration file (committed to git)
-#   .claude-block.local - Local configuration file (not committed, add to .gitignore)
+#   .block       - Main configuration file (committed to git)
+#   .block.local - Local configuration file (not committed, add to .gitignore)
 #
 # When both files exist in the same directory, they are merged:
 #   - blocked patterns: combined (union - more restrictive)
@@ -12,7 +12,7 @@
 #   - guide messages: local takes precedence
 #   - Mixing allowed/blocked modes between files is an error
 #
-# .claude-block file format (JSON):
+# .block file format (JSON):
 #   Empty file or {} = block everything
 #   { "allowed": ["pattern1", "pattern2"] } = only allow matching paths, block everything else
 #   { "blocked": ["pattern1", "pattern2"] } = only block matching paths, allow everything else
@@ -34,13 +34,13 @@
 #   ** = any characters including path separator (recursive)
 #   ? = single character
 
-MARKER_FILE_NAME=".claude-block"
-LOCAL_MARKER_FILE_NAME=".claude-block.local"
+MARKER_FILE_NAME=".block"
+LOCAL_MARKER_FILE_NAME=".block.local"
 
 # Check if jq is available - FAIL CLOSED if missing
 if ! command -v jq &> /dev/null; then
     echo "BLOCKED: jq is required for directory protection hook but is not installed." >&2
-    echo "Install jq to enable file operations, or remove .claude-block files to disable protection." >&2
+    echo "Install jq to enable file operations, or remove .block files to disable protection." >&2
     exit 2
 fi
 
@@ -167,7 +167,7 @@ get_lock_file_config() {
     has_blocked=$(echo "$content" | jq 'has("blocked")' 2>/dev/null)
 
     if [[ "$has_allowed" == "true" && "$has_blocked" == "true" ]]; then
-        config=$(echo "$config" | jq '.has_error=true | .error_message="Invalid .claude-block: cannot specify both allowed and blocked lists"')
+        config=$(echo "$config" | jq '.has_error=true | .error_message="Invalid .block: cannot specify both allowed and blocked lists"')
         echo "$config"
         return
     fi
@@ -256,7 +256,7 @@ merge_configs() {
     # Mixed modes = error
     if [[ "$main_has_allowed" == "true" && "$local_has_blocked" == "true" ]] || \
        [[ "$main_has_blocked" == "true" && "$local_has_allowed" == "true" ]]; then
-        echo '{"allowed":[],"blocked":[],"guide":"","is_empty":false,"has_error":true,"error_message":"Invalid configuration: .claude-block and .claude-block.local cannot mix allowed and blocked modes"}'
+        echo '{"allowed":[],"blocked":[],"guide":"","is_empty":false,"has_error":true,"error_message":"Invalid configuration: .block and .block.local cannot mix allowed and blocked modes"}'
         return
     fi
 
@@ -515,7 +515,7 @@ block_with_message() {
     fi
 
     # Otherwise show short default message
-    echo "BLOCKED by .claude-block: $marker_path" >&2
+    echo "BLOCKED by .block: $marker_path" >&2
     exit 2
 }
 

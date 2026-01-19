@@ -1,5 +1,5 @@
 {
-  "description": ".claude-block enforcement - blocks file modifications in protected directories",
+  "description": ".block enforcement - blocks file modifications in protected directories",
   "hooks": {
     "SessionStart": [
       {

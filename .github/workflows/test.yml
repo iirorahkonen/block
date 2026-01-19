@@ -52,7 +52,7 @@ jobs:
         run: |
           # Create a test directory with protection
           mkdir -p /tmp/test-project
-          touch /tmp/test-project/.claude-block
+          touch /tmp/test-project/.block
 
           # Test Edit tool is blocked
           echo '{"tool_name": "Edit", "tool_input": {"file_path": "/tmp/test-project/file.txt"}}' | bash hooks/protect-directories.sh && exit 1 || test $? -eq 2
@@ -154,7 +154,7 @@ jobs:
         run: |
           # Create a test directory with protection
           mkdir -p /tmp/test-project
-          touch /tmp/test-project/.claude-block
+          touch /tmp/test-project/.block
 
           # Test Edit tool is blocked
           echo '{"tool_name": "Edit", "tool_input": {"file_path": "/tmp/test-project/file.txt"}}' | bash hooks/protect-directories.sh && exit 1 || test $? -eq 2
