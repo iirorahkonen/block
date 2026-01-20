@@ -403,30 +403,30 @@ jobs:
             echo "This is acceptable as long as protected writes ARE blocked"
           fi
 
-      - name: E2E Test - All writes blocked without JQ (fail-closed)
+      - name: E2E Test - Protected writes blocked without JQ (fail-closed)
         if: matrix.jq == 'without'
         shell: bash
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
-          echo "Testing fail-closed behavior without jq..."
+          echo "Testing fail-closed behavior without jq for protected directories..."
 
           cd /tmp/e2e-test-project
 
-          # Ask Claude to write to UNPROTECTED file - should still be blocked without jq
-          OUTPUT=$(claude --print "Write the text 'SHOULD BE BLOCKED' to the file unprotected/test-no-jq.txt" --max-turns 3 --allowedTools "" 2>&1) || true
+          # Ask Claude to write to PROTECTED file - should be blocked without jq (fail-closed)
+          OUTPUT=$(claude --print "Write the text 'SHOULD BE BLOCKED' to the file protected/test-no-jq.txt" --max-turns 3 --allowedTools "" 2>&1) || true
 
           echo "Claude output:"
           echo "$OUTPUT"
           echo ""
 
           # The file should NOT exist (blocked due to missing jq - fail closed)
-          if [ -f "unprotected/test-no-jq.txt" ]; then
-            echo "FAIL: File was created even though jq is missing (fail-closed violated)!"
-            cat unprotected/test-no-jq.txt
+          if [ -f "protected/test-no-jq.txt" ]; then
+            echo "FAIL: Protected file was created even though jq is missing (fail-closed violated)!"
+            cat protected/test-no-jq.txt
             exit 1
           fi
-          echo "PASS: File was not created (fail-closed working)"
+          echo "PASS: Protected file was not created (fail-closed working)"
 
           # Check if output mentions jq is required
           if echo "$OUTPUT" | grep -qi "jq\|blocked\|install"; then
@@ -436,7 +436,37 @@ jobs:
           fi
 
           echo ""
-          echo "Fail-closed behavior working correctly - writes blocked without jq"
+          echo "Fail-closed behavior working correctly - protected writes blocked without jq"
+
+      - name: E2E Test - Unprotected writes allowed without JQ
+        if: matrix.jq == 'without'
+        shell: bash
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          echo "Testing that unprotected directories allow writes without jq..."
+
+          cd /tmp/e2e-test-project
+
+          # Ask Claude to write to UNPROTECTED file - should be ALLOWED without jq
+          # (no .block file means no jq needed)
+          OUTPUT=$(claude --print "Write the text 'ALLOWED CONTENT' to the file unprotected/test-no-jq.txt" --max-turns 3 2>&1) || true
+
+          echo "Claude output:"
+          echo "$OUTPUT"
+          echo ""
+
+          # The file SHOULD be allowed to be created (no .block in unprotected directory)
+          if [ -f "unprotected/test-no-jq.txt" ]; then
+            echo "PASS: Unprotected file was created (jq not required when no .block exists)"
+            cat unprotected/test-no-jq.txt
+          else
+            echo "Note: File may not have been created due to Claude's decision, not blocking"
+            echo "This is acceptable - the key is that protected writes ARE blocked"
+          fi
+
+          echo ""
+          echo "Unprotected write test completed"
 
       - name: E2E Test - Bash rm command blocked (with JQ)
         if: matrix.jq == 'with'
@@ -570,11 +600,11 @@ jobs:
               exit 1
             fi
           else
-            # Should block without jq (fail-closed)
+            # Should block without jq (fail-closed) for PROTECTED directory
             if echo "$PROTECT_OUTPUT" | grep -q '"decision".*:.*"block"'; then
-              echo "PASS: protect-directories returns 'block' decision (fail-closed)"
+              echo "PASS: protect-directories returns 'block' decision for protected dir (fail-closed)"
             else
-              echo "FAIL: Fail-closed not working - expected 'block' decision"
+              echo "FAIL: Fail-closed not working - expected 'block' decision for protected dir"
               exit 1
             fi
 
@@ -593,6 +623,25 @@ jobs:
               echo "PASS: Error message tells user to install jq"
             else
               echo "FAIL: Error should tell user to install jq"
+              exit 1
+            fi
+
+            echo ""
+            echo "=== Testing protect-directories.sh with UNPROTECTED path (no .block) ==="
+
+            # Test with unprotected path - should ALLOW without jq (no .block = no jq needed)
+            UNPROTECT_OUTPUT=$(echo '{"tool_name": "Edit", "tool_input": {"file_path": "/tmp/e2e-test-project/unprotected/test.txt"}}' | bash hooks/protect-directories.sh)
+            UNPROTECT_EXIT=$?
+            echo "protect-directories output for unprotected path:"
+            echo "$UNPROTECT_OUTPUT"
+            echo "Exit code: $UNPROTECT_EXIT"
+            echo ""
+
+            # Should allow (exit 0, no block decision) for unprotected directory without jq
+            if [ "$UNPROTECT_EXIT" -eq 0 ] && ! echo "$UNPROTECT_OUTPUT" | grep -q '"decision".*:.*"block"'; then
+              echo "PASS: protect-directories allows unprotected path without jq"
+            else
+              echo "FAIL: Unprotected path should be allowed without jq (no .block = no jq needed)"
               exit 1
             fi
           fi
@@ -617,7 +666,8 @@ jobs:
             echo "  - Unprotected file write allowing"
             echo "  - Bash command (rm) blocking"
           else
-            echo "  - Fail-closed behavior (all writes blocked)"
+            echo "  - Fail-closed behavior (protected writes blocked without jq)"
+            echo "  - Unprotected writes allowed without jq (no .block = no jq needed)"
           fi
           echo "  - Direct hook execution"
           echo "=========================================="
