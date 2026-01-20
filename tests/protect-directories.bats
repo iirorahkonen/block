@@ -835,7 +835,7 @@ teardown() {
 # Mode Condition Coverage Tests
 # =============================================================================
 
-@test "blocks when jq is not installed (fail-closed)" {
+@test "blocks when jq is not installed and .block file exists (fail-closed)" {
     # Skip on Windows - this test requires Unix-style PATH manipulation
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
         skip "Test not supported on Windows"
@@ -844,18 +844,62 @@ teardown() {
     # Create a directory with bash but without jq to simulate jq not installed
     mkdir -p "$TEST_DIR/no-jq-bin"
 
-    # Get bash and cat paths dynamically for cross-platform support
+    # Get bash, cat, dirname, grep, sed, head paths dynamically for cross-platform support
     local bash_path=$(command -v bash)
     local cat_path=$(command -v cat)
+    local dirname_path=$(command -v dirname)
+    local grep_path=$(command -v grep)
+    local sed_path=$(command -v sed)
+    local head_path=$(command -v head)
     cp "$bash_path" "$TEST_DIR/no-jq-bin/"
     cp "$cat_path" "$TEST_DIR/no-jq-bin/"
+    cp "$dirname_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+    cp "$grep_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+    cp "$sed_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+    cp "$head_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+
+    # Create .block file so protection is active
+    create_block_file "$TEST_DIR/project"
 
     local input=$(make_edit_input "$TEST_DIR/project/file.txt")
 
-    # Run with custom PATH that has bash but no jq
+    # Run with custom PATH that has bash but no jq - should block because .block exists
     run bash -c "PATH='$TEST_DIR/no-jq-bin' '$TEST_DIR/no-jq-bin/bash' '$HOOKS_DIR/protect-directories.sh' <<< '$input'"
     is_blocked
     [[ "$output" == *"jq is required"* ]]
+}
+
+@test "allows operations when jq is not installed and no .block file exists" {
+    # Skip on Windows - this test requires Unix-style PATH manipulation
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+        skip "Test not supported on Windows"
+    fi
+
+    # Create a directory with bash but without jq to simulate jq not installed
+    mkdir -p "$TEST_DIR/no-jq-bin"
+
+    # Get bash, cat, dirname, grep, sed, head paths dynamically for cross-platform support
+    local bash_path=$(command -v bash)
+    local cat_path=$(command -v cat)
+    local dirname_path=$(command -v dirname)
+    local grep_path=$(command -v grep)
+    local sed_path=$(command -v sed)
+    local head_path=$(command -v head)
+    cp "$bash_path" "$TEST_DIR/no-jq-bin/"
+    cp "$cat_path" "$TEST_DIR/no-jq-bin/"
+    cp "$dirname_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+    cp "$grep_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+    cp "$sed_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+    cp "$head_path" "$TEST_DIR/no-jq-bin/" 2>/dev/null || true
+
+    # NO .block file created - just an empty project
+    mkdir -p "$TEST_DIR/project"
+
+    local input=$(make_edit_input "$TEST_DIR/project/file.txt")
+
+    # Run with custom PATH that has bash but no jq - should ALLOW because no .block exists
+    run bash -c "PATH='$TEST_DIR/no-jq-bin' '$TEST_DIR/no-jq-bin/bash' '$HOOKS_DIR/protect-directories.sh' <<< '$input'"
+    [ "$status" -eq 0 ]
 }
 
 @test "local file with allowed patterns blocks all when no main file" {

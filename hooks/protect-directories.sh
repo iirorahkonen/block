@@ -54,10 +54,11 @@ has_block_file_in_hierarchy() {
 }
 
 # Extract file path from JSON without jq (simple grep/sed)
+# Note: Uses [[:space:]]* instead of \s* for macOS BSD grep compatibility
 extract_path_without_jq() {
     local input="$1"
     # Extract file_path, notebook_path, or command field
-    echo "$input" | grep -oE '"(file_path|notebook_path)"\s*:\s*"[^"]*"' | head -1 | sed 's/.*:\s*"//; s/"$//'
+    echo "$input" | grep -oE '"(file_path|notebook_path)"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*:[[:space:]]*"//; s/"$//'
 }
 
 # Read hook input from stdin first
