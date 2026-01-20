@@ -37,17 +37,58 @@
 MARKER_FILE_NAME=".block"
 LOCAL_MARKER_FILE_NAME=".block.local"
 
-# Check if jq is available - FAIL CLOSED if missing
-if ! command -v jq &> /dev/null; then
-    # Output JSON block response when jq is missing
-    echo '{"decision": "block", "reason": "jq is required for directory protection hook but is not installed. Install jq to enable file operations."}'
+# Check if .block file exists in directory hierarchy (no jq needed)
+has_block_file_in_hierarchy() {
+    local dir="$1"
+    # Normalize path separators
+    dir="${dir//\\//}"
+
+    while [[ -n "$dir" ]]; do
+        [[ -f "$dir/.block" || -f "$dir/.block.local" ]] && return 0
+        local parent
+        parent=$(dirname "$dir")
+        [[ "$parent" == "$dir" ]] && break
+        dir="$parent"
+    done
+    return 1
+}
+
+# Extract file path from JSON without jq (simple grep/sed)
+extract_path_without_jq() {
+    local input="$1"
+    # Extract file_path, notebook_path, or command field
+    echo "$input" | grep -oE '"(file_path|notebook_path)"\s*:\s*"[^"]*"' | head -1 | sed 's/.*:\s*"//; s/"$//'
+}
+
+# Read hook input from stdin first
+HOOK_INPUT=$(cat)
+
+# Quick path extraction without jq to check if .block exists
+QUICK_PATH=$(extract_path_without_jq "$HOOK_INPUT")
+
+if [[ -n "$QUICK_PATH" ]]; then
+    QUICK_DIR=$(dirname "$QUICK_PATH")
+    # Make absolute if relative
+    [[ "$QUICK_PATH" != /* && ! "$QUICK_PATH" =~ ^[A-Za-z]: ]] && QUICK_DIR="$(pwd)/$QUICK_DIR"
+
+    # If no .block file in hierarchy, allow without jq
+    if ! has_block_file_in_hierarchy "$QUICK_DIR"; then
+        exit 0  # No protection needed, allow operation
+    fi
+fi
+
+# At this point either:
+# - There's a .block file (need jq for full logic)
+# - We couldn't extract path (need jq to parse properly)
+# - It's a Bash command (need jq to extract paths)
+
+# Check if jq is available and actually works - FAIL CLOSED if missing when protection exists
+if ! command -v jq &> /dev/null || ! jq --version &> /dev/null; then
+    echo '{"decision": "block", "reason": "⚠️ jq is required for directory protection hook but is not installed or not working. All file operations are blocked as a safety measure. Install jq to enable file operations: https://jqlang.github.io/jq/download/"}'
     exit 0
 fi
 
-# Read hook input from stdin
-HOOK_INPUT=$(cat)
-
-# Parse input JSON
+# Parse input JSON (now we have jq)
 TOOL_NAME=$(echo "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 if [[ -z "$TOOL_NAME" ]]; then
     exit 0  # Allow on parse error
