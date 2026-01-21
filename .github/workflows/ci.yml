@@ -258,10 +258,9 @@ jobs:
           # Store path for later steps
           echo "E2E_DIR=${E2E_DIR}" >> $GITHUB_ENV
 
-      - name: Configure project-level hooks
+      - name: Configure hook path
         shell: bash
         run: |
-          # Create project-level settings.json with hook configuration
           HOOK_PATH="${GITHUB_WORKSPACE}/hooks/run-hook.cmd"
           echo "Hook path: $HOOK_PATH"
 
@@ -271,9 +270,8 @@ jobs:
             exit 1
           fi
 
-          printf '%s\n' "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Edit|Write|NotebookEdit|Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"${HOOK_PATH}\",\"timeout\":5000}]}]}}" > "${E2E_DIR}/.claude/settings.json"
-          echo "Created project-level settings:"
-          cat "${E2E_DIR}/.claude/settings.json"
+          # Store for later steps
+          echo "HOOK_PATH=${HOOK_PATH}" >> $GITHUB_ENV
 
       - name: E2E Test - Protected file write blocked
         shell: bash
@@ -281,14 +279,16 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           echo "Testing that protected files cannot be written..."
-          echo "Note: This test verifies file state. Direct hook tests verify hook logic."
 
           cd "${E2E_DIR}"
 
-          # Ask Claude to write to a protected file
-          # Note: --allowedTools "Write" allows Claude to attempt the write, so the hook can block it
+          # Build settings JSON with hook configuration
+          SETTINGS_JSON="{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Edit|Write|NotebookEdit|Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"${HOOK_PATH}\",\"timeout\":5000}]}]}}"
+          echo "Using settings: $SETTINGS_JSON"
+
+          # Ask Claude to write to a protected file, passing settings directly
           set +e
-          OUTPUT=$(claude --print "Write the text 'MODIFIED' to the file protected/test-write.txt" --max-turns 3 --allowedTools "Write" 2>&1)
+          OUTPUT=$(claude --print --settings "$SETTINGS_JSON" "Write the text 'MODIFIED' to the file protected/test-write.txt" --max-turns 3 --allowedTools "Write" 2>&1)
           CLAUDE_EXIT=$?
           set -e
 
@@ -332,10 +332,12 @@ jobs:
 
           cd "${E2E_DIR}"
 
-          # Ask Claude to write to an unprotected file
-          # Note: --allowedTools "Write" is needed so Claude can write without interactive permission
+          # Build settings JSON with hook configuration
+          SETTINGS_JSON="{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Edit|Write|NotebookEdit|Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"${HOOK_PATH}\",\"timeout\":5000}]}]}}"
+
+          # Ask Claude to write to an unprotected file, passing settings directly
           set +e
-          OUTPUT=$(claude --print "Write the text 'NEW CONTENT' to the file unprotected/test-write.txt" --max-turns 3 --allowedTools "Write" 2>&1)
+          OUTPUT=$(claude --print --settings "$SETTINGS_JSON" "Write the text 'NEW CONTENT' to the file unprotected/test-write.txt" --max-turns 3 --allowedTools "Write" 2>&1)
           CLAUDE_EXIT=$?
           set -e
 
