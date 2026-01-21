@@ -350,40 +350,6 @@ def test_directory_protected(file_path: str) -> Optional[dict]:
     return None
 
 
-def _extract_paths_from_tokens(tokens: list, command_handlers: dict) -> list:
-    """Extract paths from pre-tokenized command list."""
-    paths = []
-    i = 0
-    while i < len(tokens):
-        token = tokens[i]
-        if token in command_handlers:
-            handler = command_handlers[token]
-            args = []
-            i += 1
-            # Collect non-option arguments
-            while i < len(tokens) and not tokens[i].startswith("-"):
-                if tokens[i] in ("|", ";", "&", "&&", "||"):
-                    break
-                args.append(tokens[i])
-                i += 1
-            # Skip option arguments
-            while i < len(tokens) and tokens[i].startswith("-"):
-                i += 1
-                # Skip option values if needed
-                if (
-                    i < len(tokens)
-                    and not tokens[i].startswith("-")
-                    and tokens[i] not in ("|", ";", "&", "&&", "||")
-                    and not tokens[i - 1].endswith("f")
-                ):
-                    continue
-            # Apply handler to get paths from args
-            paths.extend(handler(args))
-        else:
-            i += 1
-    return paths
-
-
 def get_bash_target_paths(command: str) -> list:
     """Extract target paths from bash commands.
 
