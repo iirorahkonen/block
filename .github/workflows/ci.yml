@@ -277,24 +277,7 @@ jobs:
           mkdir -p ~/.claude
 
           # Create settings.json with hooks configuration using polyglot entry point
-          cat > ~/.claude/settings.json <<EOF
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${RUN_HOOK_PATH}",
-            "timeout": 5000
-          }
-        ]
-      }
-    ]
-  }
-}
-EOF
+          printf '%s\n' "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Edit|Write|NotebookEdit|Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"${RUN_HOOK_PATH}\",\"timeout\":5000}]}]}}" > ~/.claude/settings.json
 
           echo ""
           echo "Created Claude Code settings:"
@@ -319,24 +302,7 @@ EOF
           mkdir -p ~/.claude
 
           # Create settings.json with hooks configuration using polyglot entry point
-          cat > ~/.claude/settings.json <<EOF
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Edit|Write|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${RUN_HOOK_PATH}",
-            "timeout": 5000
-          }
-        ]
-      }
-    ]
-  }
-}
-EOF
+          printf '%s\n' "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Edit|Write|NotebookEdit|Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"${RUN_HOOK_PATH}\",\"timeout\":5000}]}]}}" > ~/.claude/settings.json
 
           echo ""
           echo "Created Claude Code settings (Windows):"
