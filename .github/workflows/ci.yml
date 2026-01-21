@@ -352,11 +352,33 @@ jobs:
           cd "${E2E_DIR}"
 
           # Ask Claude to write to a protected file
-          OUTPUT=$(claude --print "Write the text 'MODIFIED' to the file protected/test-write.txt" --max-turns 3 --allowedTools "" 2>&1) || true
+          set +e
+          OUTPUT=$(claude --print "Write the text 'MODIFIED' to the file protected/test-write.txt" --max-turns 3 --allowedTools "" 2>&1)
+          CLAUDE_EXIT=$?
+          set -e
 
+          echo "Claude exit code: $CLAUDE_EXIT"
           echo "Claude output:"
           echo "$OUTPUT"
           echo ""
+
+          # Check if Claude failed unexpectedly (not due to hook blocking)
+          if [ $CLAUDE_EXIT -ne 0 ]; then
+            echo "Claude exited with code $CLAUDE_EXIT"
+            # Only fail if it's not an expected hook block
+            if ! echo "$OUTPUT" | grep -qiE "block|protected|\.block"; then
+              echo "FAIL: Claude failed unexpectedly (not due to hook blocking)"
+              exit 1
+            fi
+            echo "Claude exit was due to hook blocking (expected)"
+          fi
+
+          # Verify hook blocking message appeared in output
+          if echo "$OUTPUT" | grep -qiE "block|protected|\.block"; then
+            echo "PASS: Hook blocking message detected in output"
+          else
+            echo "WARNING: No hook blocking message detected in output"
+          fi
 
           # The file should NOT exist (was blocked)
           if [ -f "protected/test-write.txt" ]; then
@@ -387,18 +409,35 @@ jobs:
           cd "${E2E_DIR}"
 
           # Ask Claude to write to an unprotected file
-          OUTPUT=$(claude --print "Write the text 'NEW CONTENT' to the file unprotected/test-write.txt" --max-turns 3 2>&1) || true
+          set +e
+          OUTPUT=$(claude --print "Write the text 'NEW CONTENT' to the file unprotected/test-write.txt" --max-turns 3 2>&1)
+          CLAUDE_EXIT=$?
+          set -e
 
+          echo "Claude exit code: $CLAUDE_EXIT"
           echo "Claude output:"
           echo "$OUTPUT"
+          echo ""
 
-          # The file should exist (was allowed)
+          # Check if Claude failed unexpectedly
+          if [ $CLAUDE_EXIT -ne 0 ]; then
+            echo "FAIL: Claude exited with code $CLAUDE_EXIT for unprotected file write"
+            echo "This should have succeeded - unprotected files should be writable"
+            exit 1
+          fi
+
+          # The file MUST exist (was allowed and written)
           if [ -f "unprotected/test-write.txt" ]; then
-            echo "Unprotected file write correctly allowed"
+            echo "PASS: Unprotected file write correctly allowed"
+            echo "File contents:"
             cat unprotected/test-write.txt
           else
-            echo "Note: File may not have been created due to Claude's decision, not blocking"
-            echo "This is acceptable as long as protected writes ARE blocked"
+            echo "FAIL: Unprotected file was NOT created"
+            echo "Claude output was:"
+            echo "$OUTPUT"
+            echo ""
+            echo "The hook should have allowed this write operation"
+            exit 1
           fi
 
       - name: E2E Test - Direct hook execution test
