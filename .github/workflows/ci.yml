@@ -409,8 +409,9 @@ jobs:
           cd "${E2E_DIR}"
 
           # Ask Claude to write to an unprotected file
+          # Note: --allowedTools "Write" is needed so Claude can write without interactive permission
           set +e
-          OUTPUT=$(claude --print "Write the text 'NEW CONTENT' to the file unprotected/test-write.txt" --max-turns 3 2>&1)
+          OUTPUT=$(claude --print "Write the text 'NEW CONTENT' to the file unprotected/test-write.txt" --max-turns 3 --allowedTools "Write" 2>&1)
           CLAUDE_EXIT=$?
           set -e
 
