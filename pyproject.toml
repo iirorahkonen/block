@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "block"
+version = "1.1.6"
+description = "File and directory protection for Claude Code"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Iiro Rahkonen"}
+]
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["hooks"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "C4", "UP", "PIE", "RET", "SIM", "TCH", "PL"]
+ignore = [
+    "PLR0912",  # Too many branches
+    "PLR0915",  # Too many statements
+    "PLR2004",  # Magic value comparison
+    "PLR0911",  # Too many return statements
+    "PLC0415",  # Import should be at top-level (acceptable for performance optimization)
+    "SIM108",   # Ternary operator suggestion (readability preference)
+    "E501",     # Line too long (handled by formatter, docstrings ok)
+    "PLR1714",  # Multiple comparisons merge (readability preference)
+    "PLW1510",  # subprocess.run check argument (explicit handling)
+]
+
+[tool.mypy]
+python_version = "3.9"  # mypy minimum; code is still compatible with 3.8
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
