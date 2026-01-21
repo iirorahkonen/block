@@ -152,56 +152,9 @@ jobs:
           echo "pytest version:"
           pytest --version
 
-      - name: Run pytest tests
+      - name: Run pytest tests (includes hook integration tests)
         run: |
           pytest tests/ -v --tb=short
-
-      - name: Test hook via cmd.exe (Windows-specific)
-        shell: cmd
-        run: |
-          mkdir %TEMP%\block-cmd-test
-          echo {} > %TEMP%\block-cmd-test\.block
-          echo {"tool_name": "Edit", "tool_input": {"file_path": "%TEMP%/block-cmd-test/test.txt"}} | hooks\run-hook.cmd > %TEMP%\cmd-output.txt 2>&1
-          type %TEMP%\cmd-output.txt
-          findstr /C:"block" %TEMP%\cmd-output.txt > nul
-          if errorlevel 1 (
-            echo FAIL: Expected block decision from cmd.exe test
-            exit /b 1
-          )
-          echo PASS: cmd.exe hook execution works correctly
-
-      - name: Test hook allows without .block file (no Python needed)
-        shell: cmd
-        run: |
-          REM Create a directory WITHOUT .block file
-          mkdir %TEMP%\no-block-test
-          cd %TEMP%\no-block-test
-          echo {"tool_name": "Edit", "tool_input": {"file_path": "test.txt"}} | %GITHUB_WORKSPACE%\hooks\run-hook.cmd > %TEMP%\no-block-output.txt 2>&1
-          REM Should produce no output (allow) and exit 0
-          if exist %TEMP%\no-block-output.txt (
-            for %%A in (%TEMP%\no-block-output.txt) do if %%~zA gtr 0 (
-              echo FAIL: Expected no output when no .block file exists
-              type %TEMP%\no-block-output.txt
-              exit /b 1
-            )
-          )
-          echo PASS: Hook allows operations without .block file
-
-      - name: Test hook detects .block in parent directory
-        shell: cmd
-        run: |
-          REM Create parent with .block, child without
-          mkdir %TEMP%\parent-block-test\child
-          echo {} > %TEMP%\parent-block-test\.block
-          cd %TEMP%\parent-block-test\child
-          echo {"tool_name": "Edit", "tool_input": {"file_path": "test.txt"}} | %GITHUB_WORKSPACE%\hooks\run-hook.cmd > %TEMP%\parent-output.txt 2>&1
-          type %TEMP%\parent-output.txt
-          findstr /C:"block" %TEMP%\parent-output.txt > nul
-          if errorlevel 1 (
-            echo FAIL: Expected block decision when .block in parent directory
-            exit /b 1
-          )
-          echo PASS: Hook detects .block in parent directory
 
   lint:
     name: Python Linting and Type Checking
