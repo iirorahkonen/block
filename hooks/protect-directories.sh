@@ -19,6 +19,19 @@
 #   { "guide": "message" } = common guide shown when blocked (fallback for patterns without specific guide)
 #   Both allowed and blocked = error (invalid configuration)
 #
+# Agent-specific permissions (optional):
+#   {
+#     "agents": {
+#       "agent-name": { "allowed": ["pattern"] },
+#       "other-agent": { "blocked": ["pattern"] },
+#       "*": { "blocked": [] }
+#     },
+#     "guide": "message"
+#   }
+#   Agent names match the subagent_type from Task tool invocations.
+#   Use "*" as a wildcard/default for unmatched agents.
+#   When "agents" is present, top-level allowed/blocked are ignored.
+#
 # Patterns can be strings or objects with per-pattern guides:
 #   "pattern" = simple pattern (uses common guide as fallback)
 #   { "pattern": "...", "guide": "..." } = pattern with specific guide
@@ -26,6 +39,7 @@
 # Examples:
 #   { "blocked": ["*.secret", { "pattern": "config/**", "guide": "Config files protected." }] }
 #   { "allowed": ["docs/**", { "pattern": "src/gen/**", "guide": "Generated files." }], "guide": "Fallback" }
+#   { "agents": { "tdd-test-writer": { "allowed": ["**/*.test.ts"] }, "*": { "blocked": [] } } }
 #
 # Guide priority: pattern-specific guide > common guide > default message
 #
@@ -36,6 +50,60 @@
 
 MARKER_FILE_NAME=".block"
 LOCAL_MARKER_FILE_NAME=".block.local"
+
+# Global: Current agent type (detected from transcript)
+CURRENT_AGENT_TYPE=""
+
+# Get current agent type from transcript
+# Parses the transcript to find the most recent Task tool invocation's subagent_type
+# Returns: agent type string (e.g., "tdd-test-writer") or empty if main agent/unknown
+# Note: This is a heuristic - it looks for the most recent Task invocation
+# Important: This function is called AFTER jq is verified to be available
+get_current_agent_type() {
+    local transcript_path="$1"
+
+    # If no transcript path or file doesn't exist, we can't determine agent
+    [[ -z "$transcript_path" ]] && echo "" && return
+    [[ ! -f "$transcript_path" ]] && echo "" && return
+
+    # Parse transcript to find most recent Task invocation with subagent_type
+    # The transcript is JSONL format, one JSON object per line
+    # We look for lines containing Task tool invocations and extract subagent_type
+    #
+    # Strategy: Read the last 100 lines (to limit processing) and find the most
+    # recent Task invocation. This assumes that if we're in a subagent context,
+    # there will be a recent Task invocation in the transcript.
+
+    local agent_type=""
+    local line
+
+    # Read last 100 lines, find most recent Task with subagent_type
+    while IFS= read -r line; do
+        # Try to extract subagent_type using jq
+        # The structure can vary depending on the transcript entry type
+        local extracted=""
+
+        # Try message.content array path (for assistant messages with tool_use)
+        extracted=$(echo "$line" | jq -r '(.message.content[]? | select(.name == "Task") | .input.subagent_type) // empty' 2>/dev/null)
+
+        # If not found, try direct tool_input path
+        if [[ -z "$extracted" ]]; then
+            extracted=$(echo "$line" | jq -r '.tool_input.subagent_type // empty' 2>/dev/null)
+        fi
+
+        # If not found, try content array directly
+        if [[ -z "$extracted" ]]; then
+            extracted=$(echo "$line" | jq -r '(.content[]? | select(.name == "Task") | .input.subagent_type) // empty' 2>/dev/null)
+        fi
+
+        if [[ -n "$extracted" && "$extracted" != "null" ]]; then
+            agent_type="$extracted"
+            # Don't break - we want the LAST (most recent) match
+        fi
+    done < <(tail -100 "$transcript_path" 2>/dev/null)
+
+    echo "$agent_type"
+}
 
 # Check if .block file exists in directory hierarchy (no jq needed)
 has_block_file_in_hierarchy() {
@@ -95,6 +163,12 @@ if [[ -z "$TOOL_NAME" ]]; then
     exit 0  # Allow on parse error
 fi
 
+# Detect current agent type from transcript (if available)
+TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+if [[ -n "$TRANSCRIPT_PATH" ]]; then
+    CURRENT_AGENT_TYPE=$(get_current_agent_type "$TRANSCRIPT_PATH")
+fi
+
 # Convert wildcard pattern to regex
 convert_wildcard_to_regex() {
     local pattern="$1"
@@ -106,32 +180,48 @@ convert_wildcard_to_regex() {
     local result=""
     local i=0
     local len=${#pattern}
+    local at_start=true
 
     while [[ $i -lt $len ]]; do
         local char="${pattern:$i:1}"
         local next="${pattern:$((i+1)):1}"
+        local next2="${pattern:$((i+2)):1}"
 
         case "$char" in
             '*')
                 if [[ "$next" == '*' ]]; then
                     # ** = match anything including /
-                    result+=".*"
-                    ((i++))
+                    if [[ "$at_start" == "true" && "$next2" == '/' ]]; then
+                        # **/ at start = optionally match any path + /
+                        result+="(.*/)?"
+                        ((i+=2))  # Skip ** and /
+                    else
+                        result+=".*"
+                        ((i++))  # Skip just the second *
+                    fi
                 else
                     # * = match anything except /
                     result+="[^/]*"
                 fi
+                at_start=false
                 ;;
             '?')
                 # ? = match single character
                 result+="."
+                at_start=false
                 ;;
             '.'|'^'|'$'|'['|']'|'('|')'|'{'|'}'|'+'|'|'|'\\')
                 # Escape regex special characters
                 result+="\\${char}"
+                at_start=false
+                ;;
+            '/')
+                result+="/"
+                # After a /, we might have **/ again
                 ;;
             *)
                 result+="$char"
+                at_start=false
                 ;;
         esac
         ((i++))
@@ -176,11 +266,12 @@ test_path_matches_pattern() {
 }
 
 # Get lock file configuration
+# If agents field is present, resolves config for CURRENT_AGENT_TYPE
 get_lock_file_config() {
     local marker_path="$1"
 
     # Initialize config as JSON
-    local config='{"allowed":[],"blocked":[],"guide":"","is_empty":true,"has_error":false,"error_message":""}'
+    local config='{"allowed":[],"blocked":[],"guide":"","is_empty":true,"has_error":false,"error_message":"","allow_all":false}'
 
     if [[ ! -f "$marker_path" ]]; then
         echo "$config"
@@ -203,7 +294,88 @@ get_lock_file_config() {
         return
     fi
 
-    # Check for both allowed and blocked (error)
+    # Extract guide (applies to all modes)
+    local guide
+    guide=$(echo "$content" | jq -r '.guide // ""' 2>/dev/null)
+    config=$(echo "$config" | jq --arg g "$guide" '.guide=$g')
+
+    # Check for agents field (agent-specific permissions)
+    local has_agents
+    has_agents=$(echo "$content" | jq 'has("agents")' 2>/dev/null)
+
+    if [[ "$has_agents" == "true" ]]; then
+        # Agent-based permissions mode
+        local agent_config=""
+
+        # Try to get config for current agent type
+        if [[ -n "$CURRENT_AGENT_TYPE" ]]; then
+            agent_config=$(echo "$content" | jq --arg agent "$CURRENT_AGENT_TYPE" '.agents[$agent] // empty' 2>/dev/null)
+        fi
+
+        # Fall back to wildcard "*" if no specific agent config
+        if [[ -z "$agent_config" || "$agent_config" == "null" ]]; then
+            agent_config=$(echo "$content" | jq '.agents["*"] // empty' 2>/dev/null)
+        fi
+
+        # If still no config, block everything (no matching agent rule)
+        if [[ -z "$agent_config" || "$agent_config" == "null" ]]; then
+            echo "$config"
+            return
+        fi
+
+        # Extract allowed/blocked from agent config
+        local agent_allowed agent_blocked
+        agent_allowed=$(echo "$agent_config" | jq 'has("allowed")' 2>/dev/null)
+        agent_blocked=$(echo "$agent_config" | jq 'has("blocked")' 2>/dev/null)
+
+        # Check for both allowed and blocked in agent config (error)
+        if [[ "$agent_allowed" == "true" && "$agent_blocked" == "true" ]]; then
+            config=$(echo "$config" | jq --arg agent "$CURRENT_AGENT_TYPE" '.has_error=true | .error_message=("Invalid .block: agent \"" + $agent + "\" cannot specify both allowed and blocked lists")')
+            echo "$config"
+            return
+        fi
+
+        # Extract agent-specific guide if present
+        local agent_guide
+        agent_guide=$(echo "$agent_config" | jq -r '.guide // ""' 2>/dev/null)
+        if [[ -n "$agent_guide" ]]; then
+            config=$(echo "$config" | jq --arg g "$agent_guide" '.guide=$g')
+        fi
+
+        # Extract allowed list from agent config
+        if [[ "$agent_allowed" == "true" ]]; then
+            local allowed allowed_len
+            allowed=$(echo "$agent_config" | jq '.allowed' 2>/dev/null)
+            allowed_len=$(echo "$allowed" | jq 'length' 2>/dev/null)
+            # Only set is_empty=false if there are actual patterns
+            if [[ "$allowed_len" -gt 0 ]]; then
+                config=$(echo "$config" | jq --argjson a "$allowed" '.allowed=$a | .is_empty=false')
+            else
+                # Empty allowed array means "allow nothing" (block all)
+                config=$(echo "$config" | jq --argjson a "$allowed" '.allowed=$a')
+            fi
+        fi
+
+        # Extract blocked list from agent config
+        if [[ "$agent_blocked" == "true" ]]; then
+            local blocked blocked_len
+            blocked=$(echo "$agent_config" | jq '.blocked' 2>/dev/null)
+            blocked_len=$(echo "$blocked" | jq 'length' 2>/dev/null)
+            # Only set is_empty=false if there are actual patterns
+            if [[ "$blocked_len" -gt 0 ]]; then
+                config=$(echo "$config" | jq --argjson b "$blocked" '.blocked=$b | .is_empty=false')
+            else
+                # Empty blocked array means "block nothing" (allow all)
+                # We need a special flag to indicate this
+                config=$(echo "$config" | jq --argjson b "$blocked" '.blocked=$b | .is_empty=false | .allow_all=true')
+            fi
+        fi
+
+        echo "$config"
+        return
+    fi
+
+    # Traditional mode (no agents field) - check for top-level allowed/blocked
     local has_allowed has_blocked
     has_allowed=$(echo "$content" | jq 'has("allowed")' 2>/dev/null)
     has_blocked=$(echo "$content" | jq 'has("blocked")' 2>/dev/null)
@@ -213,11 +385,6 @@ get_lock_file_config() {
         echo "$config"
         return
     fi
-
-    # Extract guide
-    local guide
-    guide=$(echo "$content" | jq -r '.guide // ""' 2>/dev/null)
-    config=$(echo "$config" | jq --arg g "$guide" '.guide=$g')
 
     # Extract allowed list
     if [[ "$has_allowed" == "true" ]]; then
@@ -591,6 +758,14 @@ test_should_block() {
     is_empty=$(echo "$config" | jq -r '.is_empty')
     if [[ "$is_empty" == "true" ]]; then
         jq -n --arg g "$guide" '{"should_block":true,"reason":"This directory tree is protected from Claude edits (full protection).","is_config_error":false,"guide":$g}'
+        return
+    fi
+
+    # Check for allow_all flag (empty blocked array means "allow everything")
+    local allow_all
+    allow_all=$(echo "$config" | jq -r '.allow_all // false')
+    if [[ "$allow_all" == "true" ]]; then
+        echo '{"should_block":false,"reason":"","is_config_error":false,"guide":""}'
         return
     fi
 
