@@ -55,29 +55,6 @@ Files matching these patterns are protected; all others can be edited.
 }
 ```
 
-### Agent-Specific Permissions (Advanced)
-```json
-{
-  "agents": {
-    "tdd-test-writer": {
-      "allowed": ["**/*.test.ts", "**/*.spec.ts"]
-    },
-    "tdd-implementer": {
-      "blocked": ["tests/**/*", "**/*.test.ts"]
-    },
-    "*": {
-      "blocked": []
-    }
-  },
-  "guide": "Agent-specific permissions are in effect"
-}
-```
-Different subagents (from Task tool) get different permissions:
-- Agent names match the `subagent_type` from Task tool invocations
-- Use `*` as a wildcard/default for unlisted agents
-- Each agent config can have `allowed` or `blocked` lists (not both)
-- When `agents` is present, top-level `allowed`/`blocked` are ignored
-
 ## Workflow
 
 ### Step 1: Ask File Type
@@ -103,7 +80,6 @@ Options:
 1. "Block all" - "Prevent all modifications in this directory"
 2. "Allowed list" - "Only allow specific file patterns to be edited"
 3. "Blocked list" - "Protect specific file patterns, allow everything else"
-4. "Agent-specific" - "Different rules for different subagents (advanced)"
 ```
 
 ### Step 3: Ask Directory Location
@@ -139,31 +115,6 @@ Pattern syntax reference:
 - `?` - matches single character
 - `{a,b}` - matches either a or b
 
-### Step 4b: Configure Agent Rules (if Agent-Specific mode)
-
-If the user chose "Agent-specific" mode, guide them through setting up agent rules:
-
-**Do NOT use AskUserQuestion here.** Instead, explain the concept and ask in plain text:
-
-> "Agent-specific permissions let you give different subagents different access. For example, a TDD test writer agent could be allowed to write test files, while an implementer agent is blocked from modifying tests.
->
-> What agents do you want to configure? For each agent, tell me:
-> 1. The agent name (e.g., 'tdd-test-writer', 'code-reviewer', 'Explore')
-> 2. Whether it should have an 'allowed' list or 'blocked' list
-> 3. What patterns apply to that agent
->
-> Also tell me what the default ('*') rule should be for agents not explicitly listed."
-
-Common agent types (from Task tool `subagent_type`):
-- `Explore` - Codebase exploration agent
-- `Plan` - Planning agent
-- `claude-code-guide` - Documentation lookup agent
-- Custom agents defined in skills/plugins
-
-Example configurations:
-- TDD setup: test-writer gets `allowed: ["**/*.test.ts"]`, implementer gets `blocked: ["**/*.test.ts"]`
-- Documentation: doc-writer gets `allowed: ["docs/**"]`, everyone else (`*`) gets `blocked: ["docs/**"]`
-
 ### Step 5: Ask About Guide Message
 
 **Do NOT use AskUserQuestion here.** Ask in plain text:
@@ -197,24 +148,6 @@ Based on the collected information, generate the configuration file.
 ```json
 {
   "blocked": ["pattern1", "pattern2"],
-  "guide": "Optional guide message"
-}
-```
-
-**Agent-Specific Mode:**
-```json
-{
-  "agents": {
-    "agent-name-1": {
-      "allowed": ["pattern1", "pattern2"]
-    },
-    "agent-name-2": {
-      "blocked": ["pattern3"]
-    },
-    "*": {
-      "blocked": []
-    }
-  },
   "guide": "Optional guide message"
 }
 ```

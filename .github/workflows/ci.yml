@@ -161,7 +161,7 @@ jobs:
         run: |
           mkdir %TEMP%\block-cmd-test
           echo {} > %TEMP%\block-cmd-test\.block
-          echo {"tool_name": "Edit", "tool_input": {"file_path": "%TEMP%/block-cmd-test/test.txt"}} | hooks\run-hook.cmd protect_directories.py > %TEMP%\cmd-output.txt 2>&1
+          echo {"tool_name": "Edit", "tool_input": {"file_path": "%TEMP%/block-cmd-test/test.txt"}} | hooks\run-hook.cmd > %TEMP%\cmd-output.txt 2>&1
           type %TEMP%\cmd-output.txt
           findstr /C:"block" %TEMP%\cmd-output.txt > nul
           if errorlevel 1 (
@@ -242,14 +242,6 @@ jobs:
             exit 1
           fi
 
-          # Check Unix wrapper
-          if [ -f "hooks/protect-directories.sh" ]; then
-            echo "Found: hooks/protect-directories.sh"
-          else
-            echo "ERROR: Missing hooks/protect-directories.sh"
-            exit 1
-          fi
-
           # Check polyglot entry point
           if [ -f "hooks/run-hook.cmd" ]; then
             echo "Found: hooks/run-hook.cmd"
@@ -308,7 +300,7 @@ jobs:
                   "hooks": [
                     {
                       "type": "command",
-                      "command": "\"${RUN_HOOK_PATH}\" protect_directories.py",
+                      "command": "\"${RUN_HOOK_PATH}\"",
                       "timeout": 5000
                     }
                   ]
@@ -350,7 +342,7 @@ jobs:
                   "hooks": [
                     {
                       "type": "command",
-                      "command": "\"${RUN_HOOK_PATH}\" protect_directories.py",
+                      "command": "\"${RUN_HOOK_PATH}\"",
                       "timeout": 5000
                     }
                   ]
