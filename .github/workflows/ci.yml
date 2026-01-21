@@ -246,6 +246,7 @@ jobs:
           E2E_DIR="${RUNNER_TEMP}/e2e-test-project"
           mkdir -p "${E2E_DIR}/protected"
           mkdir -p "${E2E_DIR}/unprotected"
+          mkdir -p "${E2E_DIR}/.claude"
 
           # Create .block file in protected directory
           echo '{}' > "${E2E_DIR}/protected/.block"
@@ -256,6 +257,15 @@ jobs:
 
           # Store path for later steps
           echo "E2E_DIR=${E2E_DIR}" >> $GITHUB_ENV
+
+      - name: Configure project-level hooks
+        shell: bash
+        run: |
+          # Create project-level settings.json with hook configuration
+          HOOK_PATH="${GITHUB_WORKSPACE}/hooks/run-hook.cmd"
+          printf '%s\n' "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Edit|Write|NotebookEdit|Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"${HOOK_PATH}\",\"timeout\":5000}]}]}}" > "${E2E_DIR}/.claude/settings.json"
+          echo "Created project-level settings:"
+          cat "${E2E_DIR}/.claude/settings.json"
 
       - name: Configure Claude Code with plugin hooks (Unix)
         if: runner.os != 'Windows'
