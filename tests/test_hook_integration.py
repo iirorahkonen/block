@@ -175,3 +175,48 @@ class TestWorkingDirectoryIndependence:
 
         assert exit_code == 0, f"Expected exit 0, got {exit_code}"
         assert "block" not in output.lower(), f"Expected allow for non-matching pattern, got: {output}"
+
+    def test_allows_unprotected_target_when_cwd_is_protected(self, tmp_path):
+        """Hook should allow targeting unprotected files even when CWD is protected.
+
+        This tests the reverse scenario: running from a protected directory
+        but targeting an absolute path in an unprotected directory.
+        """
+        protected = tmp_path / "protected"
+        unprotected = tmp_path / "unprotected"
+        protected.mkdir()
+        unprotected.mkdir()
+        (protected / ".block").write_text("{}")
+        file_path = to_posix_path(unprotected / "test.txt")
+
+        input_json = f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{file_path}"}}}}'
+        output, exit_code = run_hook(input_json, cwd=str(protected))
+
+        assert exit_code == 0, f"Expected exit 0, got {exit_code}"
+        assert "block" not in output.lower(), (
+            f"Should NOT block unprotected target when CWD is protected, got: {output}"
+        )
+
+    def test_write_tool_respects_cwd_independence(self, tmp_path):
+        """Write tool should block based on target path, not CWD."""
+        protected = tmp_path / "protected"
+        protected.mkdir()
+        (protected / ".block").write_text("{}")
+        file_path = to_posix_path(protected / "new_file.txt")
+
+        input_json = f'{{"tool_name": "Write", "tool_input": {{"file_path": "{file_path}", "content": "test"}}}}'
+        output, _ = run_hook(input_json, cwd=str(tmp_path))
+
+        assert "block" in output.lower(), f"Write tool should be blocked, got: {output}"
+
+    def test_bash_tool_respects_cwd_independence(self, tmp_path):
+        """Bash tool should block based on target path, not CWD."""
+        protected = tmp_path / "protected"
+        protected.mkdir()
+        (protected / ".block").write_text("{}")
+        file_path = to_posix_path(protected / "file.txt")
+
+        input_json = f'{{"tool_name": "Bash", "tool_input": {{"command": "touch {file_path}"}}}}'
+        output, _ = run_hook(input_json, cwd=str(tmp_path))
+
+        assert "block" in output.lower(), f"Bash tool should be blocked, got: {output}"
