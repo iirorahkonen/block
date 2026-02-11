@@ -7,6 +7,7 @@ from pathlib import Path
 # Get the hooks directory as absolute path
 HOOKS_DIR = (Path(__file__).parent.parent / "hooks").resolve()
 PROTECT_SCRIPT = HOOKS_DIR / "protect_directories.py"
+RUN_HOOK_CMD = HOOKS_DIR / "run-hook.cmd"
 
 
 def to_posix_path(path) -> str:
@@ -15,7 +16,11 @@ def to_posix_path(path) -> str:
 
 
 def run_hook(input_json: str, cwd: str = None) -> tuple[str, int]:
-    """Run the hook with given JSON input and return (output, exit_code)."""
+    """Run the hook with given JSON input and return (output, exit_code).
+
+    This calls Python directly (fast, but doesn't test the real execution path).
+    Use run_hook_cmd() to test the actual Claude Code execution path.
+    """
     result = subprocess.run(
         [sys.executable, str(PROTECT_SCRIPT)],
         input=input_json,
@@ -23,6 +28,44 @@ def run_hook(input_json: str, cwd: str = None) -> tuple[str, int]:
         text=True,
         cwd=cwd,
     )
+    return result.stdout + result.stderr, result.returncode
+
+
+def run_hook_cmd(input_json: str, cwd: str = None) -> tuple[str, int]:
+    """Run the hook via run-hook.cmd (matches Claude Code's real execution path).
+
+    This tests the actual polyglot script execution, including:
+    - Execute permissions (Unix/Mac requires +x to execute scripts directly)
+    - Polyglot Windows/Unix compatibility
+    - Python detection logic
+    - Cross-platform compatibility
+
+    On Unix/Mac, the script must have execute permissions to run directly.
+    This matches how Claude Code executes hooks and would catch permission bugs.
+    """
+    import os
+
+    # Detect platform and use appropriate execution method
+    if os.name == 'nt':  # Windows
+        # On Windows, .cmd files are executable by file association
+        result = subprocess.run(
+            [str(RUN_HOOK_CMD)],
+            input=input_json,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+        )
+    else:  # Unix/Mac
+        # On Unix, run via shell which executes the script directly
+        # This requires +x permission (the bug we're testing for!)
+        result = subprocess.run(
+            f'"{RUN_HOOK_CMD}"',
+            input=input_json,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            shell=True,
+        )
     return result.stdout + result.stderr, result.returncode
 
 
@@ -220,3 +263,107 @@ class TestWorkingDirectoryIndependence:
         output, _ = run_hook(input_json, cwd=str(tmp_path))
 
         assert "block" in output.lower(), f"Bash tool should be blocked, got: {output}"
+
+
+class TestRealExecutionPath:
+    """Test the actual run-hook.cmd execution path (matches Claude Code behavior).
+
+    These tests execute run-hook.cmd directly, exactly as Claude Code does.
+    This catches issues that direct Python execution misses:
+    - Missing execute permissions (chmod +x)
+    - Shebang/polyglot script issues
+    - Python detection failures
+    - Cross-platform compatibility
+
+    This would have caught the permission bug that was fixed in v1.1.12.
+    """
+
+    def test_hook_script_is_executable(self):
+        """Verify run-hook.cmd has execute permissions (critical for Unix/Mac)."""
+        import os
+        import stat
+
+        mode = os.stat(RUN_HOOK_CMD).st_mode
+        is_executable = bool(mode & stat.S_IXUSR)
+
+        assert is_executable, (
+            f"{RUN_HOOK_CMD} is not executable (mode: {oct(mode)}). "
+            f"Run: chmod +x {RUN_HOOK_CMD}"
+        )
+
+    def test_blocks_via_hook_cmd(self, tmp_path):
+        """Test blocking via run-hook.cmd (real Claude Code execution path)."""
+        (tmp_path / ".block").write_text("{}")
+        file_path = to_posix_path(tmp_path / "test.txt")
+
+        input_json = f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{file_path}"}}}}'
+        output, exit_code = run_hook_cmd(input_json, cwd=str(tmp_path))
+
+        assert exit_code == 0, f"Hook should exit 0 even when blocking, got: {exit_code}"
+        assert "block" in output.lower(), f"Expected block decision via hook cmd, got: {output}"
+
+    def test_allows_via_hook_cmd(self, tmp_path):
+        """Test allowing via run-hook.cmd (no .block file)."""
+        file_path = to_posix_path(tmp_path / "test.txt")
+
+        input_json = f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{file_path}"}}}}'
+        output, exit_code = run_hook_cmd(input_json, cwd=str(tmp_path))
+
+        assert exit_code == 0, f"Expected exit 0, got {exit_code}"
+        assert "block" not in output.lower(), f"Expected allow (no block), got: {output}"
+
+    def test_pattern_matching_via_hook_cmd(self, tmp_path):
+        """Test pattern matching via run-hook.cmd."""
+        (tmp_path / ".block").write_text('{"blocked": ["*.secret"]}')
+        secret_file = to_posix_path(tmp_path / "api.secret")
+        safe_file = to_posix_path(tmp_path / "readme.txt")
+
+        # Should block .secret file
+        input_json = f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{secret_file}"}}}}'
+        output, _ = run_hook_cmd(input_json, cwd=str(tmp_path))
+        assert "block" in output.lower(), f"Expected block for *.secret, got: {output}"
+
+        # Should allow other files
+        input_json = f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{safe_file}"}}}}'
+        output, _ = run_hook_cmd(input_json, cwd=str(tmp_path))
+        assert "block" not in output.lower(), f"Expected allow for .txt, got: {output}"
+
+    def test_bash_command_detection_via_hook_cmd(self, tmp_path):
+        """Test Bash command path extraction via run-hook.cmd."""
+        (tmp_path / ".block").write_text("{}")
+        file_path = to_posix_path(tmp_path / "output.txt")
+
+        # Test output redirection detection
+        input_json = f'{{"tool_name": "Bash", "tool_input": {{"command": "echo test > {file_path}"}}}}'
+        output, _ = run_hook_cmd(input_json, cwd=str(tmp_path))
+
+        assert "block" in output.lower(), f"Expected block for bash redirection, got: {output}"
+
+    def test_python_fallback_message_via_hook_cmd(self, tmp_path, monkeypatch):
+        """Test Python not found fallback message via run-hook.cmd.
+
+        Note: This test is platform-dependent and may be skipped if
+        it interferes with the actual Python detection in run-hook.cmd.
+        """
+        # This test is difficult to implement without breaking the hook
+        # We'd need to modify PATH to hide Python, which could break pytest
+        # Skip this test for now, but document the expected behavior
+        import pytest
+        pytest.skip(
+            "Difficult to test Python fallback without breaking test runner. "
+            "Expected behavior: hook should output JSON with Python requirement message "
+            "if python3/python not found in PATH."
+        )
+
+    def test_hierarchical_protection_via_hook_cmd(self, tmp_path):
+        """Test directory hierarchy traversal via run-hook.cmd."""
+        parent = tmp_path / "parent"
+        child = parent / "child"
+        child.mkdir(parents=True)
+        (parent / ".block").write_text("{}")
+        file_path = to_posix_path(child / "test.txt")
+
+        input_json = f'{{"tool_name": "Edit", "tool_input": {{"file_path": "{file_path}"}}}}'
+        output, _ = run_hook_cmd(input_json, cwd=str(child))
+
+        assert "block" in output.lower(), f"Expected block from parent .block, got: {output}"
