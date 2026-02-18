@@ -661,7 +661,7 @@ def check_descendant_block_files(dir_path: str) -> Optional[str]:
         return None
 
     try:
-        for root, dirs, files in os.walk(dir_path):
+        for root, _dirs, files in os.walk(dir_path):
             if MARKER_FILE_NAME in files:
                 return os.path.join(root, MARKER_FILE_NAME)
             if LOCAL_MARKER_FILE_NAME in files:
