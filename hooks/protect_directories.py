@@ -660,8 +660,11 @@ def check_descendant_block_files(dir_path: str) -> Optional[str]:
     if not os.path.isdir(dir_path):
         return None
 
+    normalized = os.path.normpath(dir_path)
     try:
         for root, _dirs, files in os.walk(dir_path):
+            if os.path.normpath(root) == normalized:
+                continue
             if MARKER_FILE_NAME in files:
                 return os.path.join(root, MARKER_FILE_NAME)
             if LOCAL_MARKER_FILE_NAME in files:
@@ -883,16 +886,32 @@ def main():
             elif should_block:
                 block_with_message(target_file, marker_path, reason, result_guide)
 
-        # Check if path targets a directory with protected descendants.
-        # This prevents bypassing child directory protections by operating
-        # on a parent directory (e.g., rm -rf parent/ when parent/child/.block exists).
+        # Check if path targets a directory with its own or descendant .block files.
+        # test_directory_protected() uses dirname() which may skip the target
+        # directory itself when the path has no trailing slash. We handle both
+        # the target directory and its descendants explicitly here.
         full_path = get_full_path(path)
         if os.path.isdir(full_path):
+            # Check the target directory itself for .block files.
+            for marker_name in (MARKER_FILE_NAME, LOCAL_MARKER_FILE_NAME):
+                marker = os.path.join(full_path, marker_name)
+                if os.path.isfile(marker):
+                    config = get_lock_file_config(marker)
+                    guide = config.get("guide", "")
+                    block_with_message(
+                        full_path, marker,
+                        "Directory is protected", guide,
+                    )
+
+            # Check descendant directories for .block files.
             descendant_marker = check_descendant_block_files(full_path)
             if descendant_marker:
                 config = get_lock_file_config(descendant_marker)
                 guide = config.get("guide", "")
-                block_with_message(full_path, descendant_marker, "Child directory is protected", guide)
+                block_with_message(
+                    full_path, descendant_marker,
+                    "Child directory is protected", guide,
+                )
 
     sys.exit(0)
 
