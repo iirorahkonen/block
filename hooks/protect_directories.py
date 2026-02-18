@@ -645,6 +645,41 @@ def get_bash_target_paths(command: str) -> list:
     return list(set(paths))
 
 
+def get_merged_dir_config(directory: str) -> Optional[dict]:
+    """Read and merge .block and .block.local configs for a single directory.
+
+    Returns a dict with 'config', 'marker_path' keys, or None if
+    neither marker file exists. Mirrors the per-directory merging
+    logic in test_directory_protected().
+    """
+    main_marker = os.path.join(directory, MARKER_FILE_NAME)
+    local_marker = os.path.join(directory, LOCAL_MARKER_FILE_NAME)
+    has_main = os.path.isfile(main_marker)
+    has_local = os.path.isfile(local_marker)
+
+    if not has_main and not has_local:
+        return None
+
+    main_config = (
+        get_lock_file_config(main_marker)
+        if has_main
+        else _create_empty_config()
+    )
+    local_config = (
+        get_lock_file_config(local_marker) if has_local else None
+    )
+    merged = merge_configs(main_config, local_config)
+
+    if has_main and has_local:
+        effective_path = f"{main_marker} (+ .local)"
+    elif has_main:
+        effective_path = main_marker
+    else:
+        effective_path = local_marker
+
+    return {"config": merged, "marker_path": effective_path}
+
+
 def check_descendant_block_files(dir_path: str) -> Optional[str]:
     """Check if a directory contains .block files in any descendant directory.
 
@@ -906,25 +941,25 @@ def main():
         full_path = get_full_path(path)
         if os.path.isdir(full_path):
             # Check the target directory itself for .block files.
-            for marker_name in (MARKER_FILE_NAME, LOCAL_MARKER_FILE_NAME):
-                marker = os.path.join(full_path, marker_name)
-                if os.path.isfile(marker):
-                    config = get_lock_file_config(marker)
-                    guide = config.get("guide", "")
-                    block_with_message(
-                        full_path, marker,
-                        "Directory is protected", guide,
-                    )
+            dir_info = get_merged_dir_config(full_path)
+            if dir_info:
+                guide = dir_info["config"].get("guide", "")
+                block_with_message(
+                    full_path, dir_info["marker_path"],
+                    "Directory is protected", guide,
+                )
 
             # Check descendant directories for .block files.
             descendant_marker = check_descendant_block_files(full_path)
             if descendant_marker:
-                config = get_lock_file_config(descendant_marker)
-                guide = config.get("guide", "")
-                block_with_message(
-                    full_path, descendant_marker,
-                    "Child directory is protected", guide,
-                )
+                marker_dir = os.path.dirname(descendant_marker)
+                desc_info = get_merged_dir_config(marker_dir)
+                if desc_info:
+                    guide = desc_info["config"].get("guide", "")
+                    block_with_message(
+                        full_path, desc_info["marker_path"],
+                        "Child directory is protected", guide,
+                    )
 
     sys.exit(0)
 

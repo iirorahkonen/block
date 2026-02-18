@@ -232,6 +232,39 @@ class TestChildDirBlockWithGuides:
         reason = get_block_reason(stdout)
         assert "This directory contains protected data." in reason
 
+    def test_child_local_guide_used_when_both_markers_exist(self, test_dir, hooks_dir):
+        """When child has both .block and .block.local, local guide takes precedence."""
+        parent_dir = test_dir / "parent"
+        child_dir = parent_dir / "child"
+        child_dir.mkdir(parents=True)
+        create_block_file(child_dir, '{"guide": "Main guide"}')
+        create_local_block_file(child_dir, '{"guide": "Local guide"}')
+
+        input_json = make_bash_input(f"rm -rf {parent_dir}")
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+        reason = get_block_reason(stdout)
+        assert "Local guide" in reason, (
+            f"Expected local guide to take precedence. Got: {reason}"
+        )
+
+    def test_target_dir_local_guide_used_when_both_markers_exist(self, test_dir, hooks_dir):
+        """When target dir has both .block and .block.local, local guide takes precedence."""
+        target_dir = test_dir / "target"
+        target_dir.mkdir(parents=True)
+        create_block_file(target_dir, '{"guide": "Main guide"}')
+        create_local_block_file(target_dir, '{"guide": "Local guide"}')
+
+        input_json = make_bash_input(f"rm -rf {target_dir}")
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+        reason = get_block_reason(stdout)
+        assert "Local guide" in reason, (
+            f"Expected local guide to take precedence. Got: {reason}"
+        )
+
     def test_child_block_with_patterns_still_blocks_parent_rm(self, test_dir, hooks_dir):
         """Child .block with specific patterns should still block parent rm -rf."""
         parent_dir = test_dir / "parent"
