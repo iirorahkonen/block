@@ -4,8 +4,8 @@
   "description": "File and directory protection for OpenCode using .block marker files with pattern matching",
   "main": "index.ts",
   "scripts": {
-    "prepack": "node -e \"require('fs').copyFileSync('../hooks/protect_directories.py','protect_directories.py')\"",
-    "postpack": "node -e \"try{require('fs').unlinkSync('protect_directories.py')}catch(e){}\""
+    "prepack": "node -e \"const fs=require('fs');fs.copyFileSync('../hooks/protect_directories.py','protect_directories.py');fs.copyFileSync('../README.md','README.md')\"",
+    "postpack": "node -e \"const fs=require('fs');['protect_directories.py','README.md'].forEach(f=>{try{fs.unlinkSync(f)}catch(e){}})\""
   },
   "keywords": [
     "opencode",
