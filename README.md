@@ -49,7 +49,18 @@ Or for local development, clone this repo and reference the plugin directly:
 }
 ```
 
-You can also copy `opencode/index.ts` into your project's `.opencode/plugin/` directory along with the `hooks/` folder.
+You can also set up the plugin manually by copying files into your project. The plugin expects `hooks/protect_directories.py` to be a sibling of the directory containing `index.ts`:
+
+```
+your-project/
+├── .opencode/
+│   └── plugin/
+│       └── index.ts              # copied from opencode/index.ts
+├── hooks/
+│   └── protect_directories.py    # copied from hooks/protect_directories.py
+```
+
+> **Note:** The `tool.execute.before` hook protects tools called by the primary agent. Tools invoked by subagents spawned via the `task` tool may not be intercepted.
 
 ## Usage
 
