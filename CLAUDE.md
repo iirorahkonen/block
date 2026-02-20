@@ -58,3 +58,7 @@ When creating git worktrees, use the `.worktree` folder in the project root:
 ```
 git worktree add .worktree/<worktree-name> <branch-name>
 ```
+
+## Changelog
+
+When making user-facing changes, update `CHANGELOG.md` in the project root. Add entries under an `## Unreleased` section at the top, following the existing format: brief description of what changed and why it matters to users, with PR references where applicable.
