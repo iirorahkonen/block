@@ -16,8 +16,10 @@ This script is invoked by Claude Code hooks and should:
 import json
 import os
 import sys
+import time
 
 _LOCK_SIZE = 1024
+_LOCK_TIMEOUT = 10  # seconds
 
 
 def _lock_file(f):
@@ -29,7 +31,17 @@ def _lock_file(f):
             f.write(" ")
             f.flush()
             f.seek(0)
-            msvcrt.locking(f.fileno(), msvcrt.LK_LOCK, _LOCK_SIZE)
+            # LK_LOCK only retries for 1 second; use LK_NBLCK with our own
+            # retry loop for a longer timeout to handle slow CI environments
+            deadline = time.monotonic() + _LOCK_TIMEOUT
+            while True:
+                try:
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, _LOCK_SIZE)
+                    return  # Lock acquired
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        return  # Give up but don't crash
+                    time.sleep(0.05)
         else:
             import fcntl
             fcntl.flock(f, fcntl.LOCK_EX)

@@ -468,7 +468,7 @@ def _merge_hierarchical_configs(child_config: dict, parent_config: dict) -> dict
 
 def _config_has_agent_rules(config: dict) -> bool:
     """Check if config has any agent-scoping rules."""
-    return config.get("has_agents_key", False) or config.get("has_disable_main_agent_key", False)
+    return bool(config.get("has_agents_key", False)) or bool(config.get("has_disable_main_agent_key", False))
 
 
 def _tool_use_id_in_transcript(transcript_path: str, tool_use_id: str) -> bool:
@@ -516,7 +516,7 @@ def resolve_agent_type(data: dict) -> Optional[str]:
         # Subagent transcript: {transcript_dir}/subagents/{agent_id}.jsonl
         subagent_transcript = os.path.join(transcript_dir, "subagents", f"{agent_id}.jsonl")
         if _tool_use_id_in_transcript(subagent_transcript, tool_use_id):
-            return agent_type
+            return str(agent_type)
 
     return None
 
