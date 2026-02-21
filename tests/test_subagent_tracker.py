@@ -58,12 +58,6 @@ def read_tracking_file(transcript_dir: Path) -> dict:
 
 
 @pytest.fixture
-def hooks_dir():
-    """Path to the hooks directory."""
-    return Path(__file__).parent.parent / "hooks"
-
-
-@pytest.fixture
 def transcript_dir(tmp_path):
     """Create a temporary transcript directory."""
     transcript = tmp_path / "transcript.jsonl"

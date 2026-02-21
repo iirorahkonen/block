@@ -450,6 +450,7 @@ class TestAgentResolution:
         """Multiple subagents active, tool_use_id in first → returns first agent's type."""
         transcript = tmp_path / "transcript.jsonl"
         transcript.touch()
+        # Dict insertion order (guaranteed in Python 3.7+) determines iteration order
         create_agent_tracking_file(tmp_path, {
             "agent_abc": "Explore",
             "agent_def": "Plan",
@@ -466,6 +467,7 @@ class TestAgentResolution:
         """Multiple subagents active, tool_use_id in second → returns second agent's type."""
         transcript = tmp_path / "transcript.jsonl"
         transcript.touch()
+        # Dict insertion order (guaranteed in Python 3.7+) determines iteration order
         create_agent_tracking_file(tmp_path, {
             "agent_abc": "Explore",
             "agent_def": "Plan",

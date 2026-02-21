@@ -140,6 +140,36 @@ Keep Claude focused on specific directories during feature work:
 }
 ```
 
+### Agent-Specific Rules (Claude Code only)
+
+Scope protection to specific subagent types. This is useful when you want to block certain agents (like Explore) from reading sensitive files, while allowing the main agent and other subagents to operate freely.
+
+Block only specific subagent types:
+
+```json
+{
+  "agents": ["Explore"],
+  "disable_main_agent": true
+}
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `agents` | `string[]` | Subagent types to block (e.g. `"Explore"`, `"Plan"`, `"Bash"`) |
+| `disable_main_agent` | `bool` | When `true`, the main agent is exempt from blocking |
+
+**Truth table:**
+
+| Config | Main agent | Listed subagents | Other subagents |
+|--------|-----------|-----------------|-----------------|
+| No agent keys | Blocked | Blocked | Blocked |
+| `agents: ["Explore"]` | Blocked | Blocked | Allowed |
+| `disable_main_agent: true` | Allowed | Blocked | Blocked |
+| Both keys set | Allowed | Blocked | Allowed |
+| `agents: []` | Blocked | Allowed | Allowed |
+
+Existing `.block` files without agent keys continue to block all agents (backward-compatible). Agent fields are inherited through hierarchical merges, with child/local files overriding parent values.
+
 ## Pattern Syntax
 
 | Pattern | Description |
@@ -231,7 +261,9 @@ pytest tests/ -v --cov=hooks --cov-report=term-missing
 block/
 ├── hooks/
 │   ├── protect_directories.py   # Main protection logic (Python)
-│   └── run-hook.cmd             # Cross-platform entry point (Claude Code)
+│   ├── subagent_tracker.py      # Subagent event tracker (Claude Code)
+│   ├── run-hook.cmd             # Cross-platform entry point (Claude Code)
+│   └── run-subagent-hook.cmd    # Subagent hook entry point (Claude Code)
 ├── opencode/
 │   ├── index.ts                 # OpenCode plugin entry point
 │   └── package.json             # npm package metadata

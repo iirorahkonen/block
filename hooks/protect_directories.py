@@ -217,13 +217,17 @@ def get_lock_file_config(marker_path: str) -> dict:
         config["has_blocked_key"] = True
         config["is_empty"] = False
 
-    # Parse agent-scoping keys
+    # Parse agent-scoping keys (with type validation)
     if "agents" in data:
-        config["agents"] = data["agents"]
-        config["has_agents_key"] = True
+        agents_val = data["agents"]
+        if isinstance(agents_val, list):
+            config["agents"] = agents_val
+            config["has_agents_key"] = True
     if "disable_main_agent" in data:
-        config["disable_main_agent"] = data["disable_main_agent"]
-        config["has_disable_main_agent_key"] = True
+        disable_val = data["disable_main_agent"]
+        if isinstance(disable_val, bool):
+            config["disable_main_agent"] = disable_val
+            config["has_disable_main_agent_key"] = True
 
     return config
 
@@ -557,6 +561,20 @@ def should_apply_to_agent(config: dict, agent_type: Optional[str]) -> bool:
 
     # No agents key, but disable_main_agent key → all subagents blocked
     return True
+
+
+def _agent_exempt(config: dict, data: dict, agent_state: dict) -> bool:
+    """Check if the current agent is exempt from this config's rules.
+
+    agent_state is a mutable dict with 'resolved' and 'type' keys used as a lazy cache.
+    Returns True if the agent is exempt (should NOT be blocked).
+    """
+    if not _config_has_agent_rules(config):
+        return False
+    if not agent_state["resolved"]:
+        agent_state["type"] = resolve_agent_type(data)
+        agent_state["resolved"] = True
+    return not should_apply_to_agent(config, agent_state["type"])
 
 
 def test_directory_protected(file_path: str) -> Optional[dict]:
@@ -1056,8 +1074,7 @@ def main():
         sys.exit(0)
 
     # Lazy agent resolution: resolved once when first needed, cached for all paths
-    agent_resolved = False
-    agent_type = None  # None = main agent
+    agent_state = {"resolved": False, "type": None}
 
     for path in paths_to_check:
         if not path:
@@ -1075,36 +1092,12 @@ def main():
             target_file = protection_info["target_file"]
             marker_path = protection_info["marker_path"]
 
-            # Check agent rules before blocking
-            if _config_has_agent_rules(config):
-                if not agent_resolved:
-                    agent_type = resolve_agent_type(data)
-                    agent_resolved = True
-                if not should_apply_to_agent(config, agent_type):
-                    # Agent rules say this agent is exempt — skip blocking for this path
-                    pass
-                else:
-                    block_result = test_should_block(target_file, protection_info)
-                    should_block = block_result["should_block"]
-                    is_config_error = block_result["is_config_error"]
-                    reason = block_result["reason"]
-                    result_guide = block_result["guide"]
-
-                    if is_config_error:
-                        block_config_error(marker_path, reason)
-                    elif should_block:
-                        block_with_message(target_file, marker_path, reason, result_guide)
-            else:
+            if not _agent_exempt(config, data, agent_state):
                 block_result = test_should_block(target_file, protection_info)
-                should_block = block_result["should_block"]
-                is_config_error = block_result["is_config_error"]
-                reason = block_result["reason"]
-                result_guide = block_result["guide"]
-
-                if is_config_error:
-                    block_config_error(marker_path, reason)
-                elif should_block:
-                    block_with_message(target_file, marker_path, reason, result_guide)
+                if block_result["is_config_error"]:
+                    block_config_error(marker_path, block_result["reason"])
+                elif block_result["should_block"]:
+                    block_with_message(target_file, marker_path, block_result["reason"], block_result["guide"])
 
         # Check if path targets a directory with its own or descendant .block files.
         # test_directory_protected() uses dirname() which may skip the target
@@ -1114,52 +1107,24 @@ def main():
         if os.path.isdir(full_path):
             # Check the target directory itself for .block files.
             dir_info = get_merged_dir_config(full_path)
-            if dir_info:
-                dir_config = dir_info["config"]
-                if _config_has_agent_rules(dir_config):
-                    if not agent_resolved:
-                        agent_type = resolve_agent_type(data)
-                        agent_resolved = True
-                    if not should_apply_to_agent(dir_config, agent_type):
-                        pass  # Agent exempt — skip directory block
-                    else:
-                        guide = dir_config.get("guide", "")
-                        block_with_message(
-                            full_path, dir_info["marker_path"],
-                            "Directory is protected", guide,
-                        )
-                else:
-                    guide = dir_config.get("guide", "")
-                    block_with_message(
-                        full_path, dir_info["marker_path"],
-                        "Directory is protected", guide,
-                    )
+            if dir_info and not _agent_exempt(dir_info["config"], data, agent_state):
+                guide = dir_info["config"].get("guide", "")
+                block_with_message(
+                    full_path, dir_info["marker_path"],
+                    "Directory is protected", guide,
+                )
 
             # Check descendant directories for .block files.
             descendant_marker = check_descendant_block_files(full_path)
             if descendant_marker:
                 marker_dir = os.path.dirname(descendant_marker)
                 desc_info = get_merged_dir_config(marker_dir)
-                if desc_info:
-                    desc_config = desc_info["config"]
-                    if _config_has_agent_rules(desc_config):
-                        if not agent_resolved:
-                            agent_type = resolve_agent_type(data)
-                            agent_resolved = True
-                        if not should_apply_to_agent(desc_config, agent_type):
-                            pass  # Agent exempt
-                        else:
-                            guide = desc_config.get("guide", "")
-                            block_with_message(
-                                full_path, desc_info["marker_path"],
-                                "Child directory is protected", guide,
-                            )
-                    else:
-                        guide = desc_config.get("guide", "")
-                        block_with_message(
-                            full_path, desc_info["marker_path"],
-                            "Child directory is protected", guide,
-                        )
+                if desc_info and not _agent_exempt(desc_info["config"], data, agent_state):
+                    guide = desc_info["config"].get("guide", "")
+                    block_with_message(
+                        full_path, desc_info["marker_path"],
+                        "Child directory is protected", guide,
+                    )
 
     sys.exit(0)
 

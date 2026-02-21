@@ -90,52 +90,29 @@ def make_notebook_input(notebook_path: str) -> str:
     })
 
 
-def make_edit_input_with_agent(file_path: str, tool_use_id: str = "", transcript_path: str = "") -> str:
-    """Create hook input JSON for Edit tool with agent context fields."""
-    data = {
-        "tool_name": "Edit",
-        "tool_input": {
-            "file_path": file_path,
-            "old_string": "old",
-            "new_string": "new"
-        }
-    }
+def _add_agent_fields(base_json: str, tool_use_id: str, transcript_path: str) -> str:
+    """Inject agent context fields into a base hook input JSON string."""
+    data = json.loads(base_json)
     if tool_use_id:
         data["tool_use_id"] = tool_use_id
     if transcript_path:
         data["transcript_path"] = transcript_path
     return json.dumps(data)
+
+
+def make_edit_input_with_agent(file_path: str, tool_use_id: str = "", transcript_path: str = "") -> str:
+    """Create hook input JSON for Edit tool with agent context fields."""
+    return _add_agent_fields(make_edit_input(file_path), tool_use_id, transcript_path)
 
 
 def make_write_input_with_agent(file_path: str, tool_use_id: str = "", transcript_path: str = "") -> str:
     """Create hook input JSON for Write tool with agent context fields."""
-    data = {
-        "tool_name": "Write",
-        "tool_input": {
-            "file_path": file_path,
-            "content": "test content"
-        }
-    }
-    if tool_use_id:
-        data["tool_use_id"] = tool_use_id
-    if transcript_path:
-        data["transcript_path"] = transcript_path
-    return json.dumps(data)
+    return _add_agent_fields(make_write_input(file_path), tool_use_id, transcript_path)
 
 
 def make_bash_input_with_agent(command: str, tool_use_id: str = "", transcript_path: str = "") -> str:
     """Create hook input JSON for Bash tool with agent context fields."""
-    data = {
-        "tool_name": "Bash",
-        "tool_input": {
-            "command": command
-        }
-    }
-    if tool_use_id:
-        data["tool_use_id"] = tool_use_id
-    if transcript_path:
-        data["transcript_path"] = transcript_path
-    return json.dumps(data)
+    return _add_agent_fields(make_bash_input(command), tool_use_id, transcript_path)
 
 
 def create_agent_tracking_file(transcript_dir: Path, agent_map: dict) -> Path:
