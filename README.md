@@ -142,7 +142,7 @@ Keep Claude focused on specific directories during feature work:
 
 ### Agent-Specific Rules (Claude Code only)
 
-Scope protection to specific subagent types. This is useful when you want to block certain agents (like Explore) from reading sensitive files, while allowing the main agent and other subagents to operate freely.
+Scope protection to specific subagent types. This is useful when you want to block certain subagents from modifying files, while allowing the main agent and other subagent types to operate freely.
 
 Block only specific subagent types:
 
