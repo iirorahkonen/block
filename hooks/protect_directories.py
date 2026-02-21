@@ -548,9 +548,7 @@ def should_apply_to_agent(config: dict, agent_type: Optional[str]) -> bool:
 
     if is_main:
         # Main agent is exempt if disable_main_agent is true
-        if has_disable_key and disable_main:
-            return False
-        return True
+        return not (has_disable_key and disable_main)
 
     # Subagent
     if has_agents_key:

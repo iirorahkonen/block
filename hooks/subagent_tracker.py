@@ -17,7 +17,6 @@ import json
 import os
 import sys
 
-
 _LOCK_SIZE = 1024
 
 

@@ -9,28 +9,24 @@ Covers:
 - End-to-end hook invocation with agent context
 - Parallel subagent scenarios
 """
+import importlib.util
 import json
-import sys
 from pathlib import Path
-
-import pytest
 
 from tests.conftest import (
     create_agent_tracking_file,
     create_agent_transcript,
     create_block_file,
-    create_local_block_file,
     get_block_reason,
     is_blocked,
-    make_edit_input_with_agent,
     make_bash_input_with_agent,
+    make_edit_input_with_agent,
     run_hook,
 )
 
 # Import functions under test via importlib to avoid polluting sys.path
 # (adding hooks/ to sys.path causes pytest to collect test_* functions
 # from protect_directories.py)
-import importlib.util
 _spec = importlib.util.spec_from_file_location(
     "protect_directories",
     str(Path(__file__).parent.parent / "hooks" / "protect_directories.py"),
