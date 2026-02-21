@@ -259,3 +259,130 @@ class TestBashCommandsQuotedPaths:
         exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
 
         assert is_blocked(stdout)
+
+
+class TestBashCommandsInplaceEditors:
+    """Tests for bash commands with in-place file editors."""
+
+    def test_detects_sed_i_target(self, test_dir, hooks_dir):
+        """Should detect sed -i command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"sed -i 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_sed_inplace_target(self, test_dir, hooks_dir):
+        """Should detect sed --in-place command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"sed --in-place 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_sed_i_with_backup_suffix(self, test_dir, hooks_dir):
+        """Should detect sed -i.bak command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"sed -i.bak 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_sed_i_with_explicit_script(self, test_dir, hooks_dir):
+        """Should detect sed -i -e command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"sed -i -e 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_awk_inplace_target(self, test_dir, hooks_dir):
+        """Should detect awk -i inplace command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"awk -i inplace '{{print}}' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_perl_i_target(self, test_dir, hooks_dir):
+        """Should detect perl -i command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"perl -i -pe 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_perl_i_with_e_flag(self, test_dir, hooks_dir):
+        """Should detect perl -i -e command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"perl -i -e 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_patch_target(self, test_dir, hooks_dir):
+        """Should detect patch command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"patch {project_dir}/file.txt < diff.patch")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_detects_patch_with_output_flag(self, test_dir, hooks_dir):
+        """Should detect patch -o command target."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"patch -o {project_dir}/output.txt < diff.patch")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert is_blocked(stdout)
+
+    def test_allows_sed_without_i_flag(self, test_dir, hooks_dir):
+        """Should allow sed without -i flag (read-only)."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"sed 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert exit_code == 0
+        assert not is_blocked(stdout)
+
+    def test_allows_awk_without_inplace(self, test_dir, hooks_dir):
+        """Should allow awk without -i inplace (read-only)."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"awk '{{print}}' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert exit_code == 0
+        assert not is_blocked(stdout)
+
+    def test_allows_perl_without_i_flag(self, test_dir, hooks_dir):
+        """Should allow perl without -i flag (read-only)."""
+        project_dir = test_dir / "project"
+        create_block_file(project_dir)
+        input_json = make_bash_input(f"perl -pe 's/old/new/' {project_dir}/file.txt")
+
+        exit_code, stdout, stderr = run_hook(hooks_dir, input_json)
+
+        assert exit_code == 0
+        assert not is_blocked(stdout)

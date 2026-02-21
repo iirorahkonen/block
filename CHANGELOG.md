@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+- **Security fix**: Bash command detection now catches `sed -i`, `awk -i inplace`, `perl -i`, and `patch` commands that modify files in-place. Previously these commands could bypass `.block` protection.
+
 ## v1.3.0 (2026-02-21)
 
 - **Subagent-aware blocking rules** (Claude Code only): `.block` files can now scope protection rules to specific subagent types using new `agents` and `disable_main_agent` configuration keys. For example, `{"agents": ["Explore"], "disable_main_agent": true}` blocks only Explore subagents while allowing the main agent and other subagent types. Rules are backward-compatible — existing `.block` files without agent keys continue to block all agents. Agent fields are inherited through hierarchical and same-directory merges with child/local overrides. (PR #26)

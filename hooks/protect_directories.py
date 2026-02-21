@@ -743,6 +743,138 @@ def get_bash_target_paths(command: str) -> list:
                     i += 1
                 continue
 
+            # In-place file modification commands
+            if token == "sed":
+                # sed -i / --in-place modifies files; without -i it's read-only
+                has_inplace = False
+                has_explicit_script = False
+                scan = i + 1
+                while scan < len(tokens) and tokens[scan] not in ("|", ";", "&", "&&", "||"):
+                    arg = tokens[scan]
+                    if arg.startswith("--in-place"):
+                        has_inplace = True
+                    elif arg.startswith("-") and not arg.startswith("--") and "i" in arg[1:]:
+                        has_inplace = True
+                    if arg in ("-e", "-f"):
+                        has_explicit_script = True
+                        scan += 1  # skip the argument to -e/-f
+                    scan += 1
+
+                if has_inplace:
+                    first_nonoption_seen = False
+                    i += 1
+                    while i < len(tokens):
+                        arg = tokens[i]
+                        if arg in ("|", ";", "&", "&&", "||", ">", ">>"):
+                            break
+                        if arg.startswith("--in-place"):
+                            i += 1
+                            continue
+                        if arg.startswith("-") and not arg.startswith("--") and "i" in arg[1:]:
+                            i += 1
+                            continue
+                        if arg in ("-e", "-f"):
+                            i += 2
+                            continue
+                        if arg.startswith("-"):
+                            i += 1
+                            continue
+                        if not has_explicit_script and not first_nonoption_seen:
+                            # Without -e/-f, first non-option is the sed script
+                            first_nonoption_seen = True
+                            i += 1
+                            continue
+                        paths.append(arg)
+                        i += 1
+                    continue
+                i += 1
+                continue
+
+            if token in ("awk", "gawk"):
+                # awk -i inplace modifies files (GNU awk extension)
+                has_inplace = False
+                scan = i + 1
+                while scan < len(tokens) and tokens[scan] not in ("|", ";", "&", "&&", "||"):
+                    if tokens[scan] == "-i" and scan + 1 < len(tokens) and tokens[scan + 1] == "inplace":
+                        has_inplace = True
+                        break
+                    scan += 1
+
+                if has_inplace:
+                    program_seen = False
+                    i += 1
+                    while i < len(tokens):
+                        arg = tokens[i]
+                        if arg in ("|", ";", "&", "&&", "||", ">", ">>"):
+                            break
+                        if arg == "-i":
+                            i += 2  # skip -i and its argument (e.g., inplace)
+                            continue
+                        if arg in ("-v", "-f"):
+                            i += 2
+                            continue
+                        if arg.startswith("-"):
+                            i += 1
+                            continue
+                        if not program_seen:
+                            program_seen = True
+                            i += 1
+                            continue
+                        paths.append(arg)
+                        i += 1
+                    continue
+                i += 1
+                continue
+
+            if token == "perl":
+                # perl -i modifies files in-place
+                has_inplace = False
+                scan = i + 1
+                while scan < len(tokens) and tokens[scan] not in ("|", ";", "&", "&&", "||"):
+                    arg = tokens[scan]
+                    if arg.startswith("-") and not arg.startswith("--") and "i" in arg[1:]:
+                        has_inplace = True
+                        break
+                    scan += 1
+
+                if has_inplace:
+                    i += 1
+                    while i < len(tokens):
+                        arg = tokens[i]
+                        if arg in ("|", ";", "&", "&&", "||", ">", ">>"):
+                            break
+                        if arg == "-e":
+                            i += 2  # skip -e and code argument
+                            continue
+                        if arg.startswith("-"):
+                            i += 1
+                            continue
+                        paths.append(arg)
+                        i += 1
+                    continue
+                i += 1
+                continue
+
+            if token == "patch":
+                i += 1
+                while i < len(tokens):
+                    arg = tokens[i]
+                    if arg in ("|", ";", "&", "&&", "||", ">", ">>", "<"):
+                        break
+                    if arg == "-o" and i + 1 < len(tokens):
+                        paths.append(tokens[i + 1])
+                        i += 2
+                        continue
+                    if arg in ("-i", "-d"):
+                        i += 2  # skip flag and its argument
+                        continue
+                    if arg.startswith("-"):
+                        i += 1
+                        continue
+                    paths.append(arg)
+                    i += 1
+                continue
+
             i += 1
 
     except ValueError:
@@ -808,6 +940,36 @@ def get_bash_target_paths(command: str) -> list:
                 if path and not path.startswith("-"):
                     paths.append(path)
             break
+
+    # In-place editor regex patterns (fallback for when shlex fails)
+    inplace_patterns = [
+        # sed -i: file path after sed script (single-quoted script)
+        (r"\bsed\s+(?:-\S+\s+)*-i\S*\s+(?:-\S+\s+)*'[^']*'\s+\"([^\"]+)\"", 1),
+        (r"\bsed\s+(?:-\S+\s+)*-i\S*\s+(?:-\S+\s+)*'[^']*'\s+'([^']+)'", 1),
+        (r"\bsed\s+(?:-\S+\s+)*-i\S*\s+(?:-\S+\s+)*'[^']*'\s+([^\s|;&>]+)", 1),
+        # sed --in-place: file path after sed script
+        (r"\bsed\s+(?:-\S+\s+)*--in-place\S*\s+(?:-\S+\s+)*'[^']*'\s+\"([^\"]+)\"", 1),
+        (r"\bsed\s+(?:-\S+\s+)*--in-place\S*\s+(?:-\S+\s+)*'[^']*'\s+'([^']+)'", 1),
+        (r"\bsed\s+(?:-\S+\s+)*--in-place\S*\s+(?:-\S+\s+)*'[^']*'\s+([^\s|;&>]+)", 1),
+        # perl -i: file path after code
+        (r"\bperl\s+(?:-\S+\s+)*-\S*i\S*\s+(?:-\S+\s+)*'[^']*'\s+\"([^\"]+)\"", 1),
+        (r"\bperl\s+(?:-\S+\s+)*-\S*i\S*\s+(?:-\S+\s+)*'[^']*'\s+'([^']+)'", 1),
+        (r"\bperl\s+(?:-\S+\s+)*-\S*i\S*\s+(?:-\S+\s+)*'[^']*'\s+([^\s|;&>]+)", 1),
+        # awk -i inplace: file path after awk program
+        (r"\bawk\s+[^|;&]*-i\s+inplace\s+(?:-\S+\s+)*'[^']*'\s+\"([^\"]+)\"", 1),
+        (r"\bawk\s+[^|;&]*-i\s+inplace\s+(?:-\S+\s+)*'[^']*'\s+'([^']+)'", 1),
+        (r"\bawk\s+[^|;&]*-i\s+inplace\s+(?:-\S+\s+)*'[^']*'\s+([^\s|;&>]+)", 1),
+        # patch: file path
+        (r"\bpatch\s+(?:-\S+\s+)*\"([^\"]+)\"", 1),
+        (r"\bpatch\s+(?:-\S+\s+)*'([^']+)'", 1),
+        (r"\bpatch\s+(?:-\S+\s+)*([^\s|;&<>]+)", 1),
+    ]
+
+    for pattern, group in inplace_patterns:
+        for match in re.finditer(pattern, command):
+            path = match.group(group)
+            if path and not path.startswith("-"):
+                paths.append(path)
 
     return list(set(paths))
 
